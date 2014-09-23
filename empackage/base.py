@@ -1,21 +1,32 @@
+"""
+Base class to create project packagers
+Projects should implement a class that inherits BasePackager and add any
+extra required build/packaging steps
+"""
 import os
 from fabric.api import (
-        settings,
-        run,
-        local,
-        cd,
-        env,
-        sudo,
-        put,
-        shell_env,
-        get,
-        hide)
+    settings,
+    run,
+    local,
+    cd,
+    env,
+    sudo,
+    put,
+    shell_env,
+    get,
+    hide,
+)
 from fabtools.files import is_dir
 
 
 BASE_PATH = "/tmp/"
 
 class BasePackager(object):
+    """
+    Base class to create project packagers
+    Projects should implement a class that inherits BasePackager and add any
+    extra required build/packaging steps
+    """
     def __init__(self, conf):
         self.conf = conf
 
@@ -42,8 +53,9 @@ class BasePackager(object):
 
 
     def prepare(self, skip_packages=False, update=False):
-        print 'Preparing...'
+        """Prepare system, install packages and fpm"""
 
+        print 'Preparing...'
         if self.build_deps and not skip_packages:
             print 'Installing packages...'
             sudo('apt-get update -qq')
@@ -55,10 +67,12 @@ class BasePackager(object):
 
 
     def build_project(self):
+        """Packagers need to implement the build step themselves"""
         raise NotImplementedError
 
 
     def checkout_project(self, update=False):
+        """Checkout/update project from repository"""
         # Setup deploy key
         self.setup_deploy_key()
 
@@ -98,6 +112,7 @@ class BasePackager(object):
 
 
     def build_pkg(self, push=False, download=True):
+        """Build package"""
         print 'Building package...'
 
         run('rm -rf {}'.format(self.pkg_path))

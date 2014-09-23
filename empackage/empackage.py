@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+"""Commnad line tool to build a package"""
 
 import importlib
 import os
@@ -11,25 +12,33 @@ import yaml
 
 
 def vagrant(name=''):
+    """Setup fabric to use vagrant"""
     config = ssh_config(name)
     extra_args = _settings_dict(config)
     env.update(extra_args)
 
 
 @click.command()
-@click.option('--push', '-p', is_flag=True,
-        help='Push to repo')
-@click.option('--skip-packages', is_flag=True,
-        help='Skip installing packages')
-@click.option('--update', is_flag=True,
-        help='Clear app dir')
-@click.option('--download', '-d', is_flag=True,
-        help='Download package')
+@click.option('--push', '-p', is_flag=True, help='Push to repo')
+@click.option('--skip-packages', is_flag=True, help='Skip installing packages')
+@click.option('--update', is_flag=True, help='Clear app dir')
+@click.option('--download', '-d', is_flag=True, help='Download package')
 @click.argument('config', default='build.yml')
 @click.argument('packager', default='packager')
 def main(push, skip_packages, update, download, config, packager):
     """Build and package"""
-    config = yaml.safe_load(open(config))
+    extension = os.path.splitext(config)[1]
+    if extension in ('.yml', '.yaml'):
+        config = yaml.safe_load(open(config))
+    elif extension == ('.py', ''):
+        if extension == '.py':
+            config = config[:3]
+        config = import_module(config)['config']
+    else:
+        raise NotImplementedError(
+            'No loader defined for filetype {}'.format(extension)
+        )
+
     if config['target'] == 'vagrant':
         vagrant()
     else:
@@ -42,6 +51,7 @@ def main(push, skip_packages, update, download, config, packager):
 
 
 def build(push, skip_packages, update, download, config, packager):
+    """Initiate fabric task to build package"""
     sys.path.insert(0, '.')
     packager = importlib.import_module(packager)
     pkgr = packager.Packager(config)
