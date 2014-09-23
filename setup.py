@@ -15,7 +15,7 @@ setup(
         'click==3.2',
     ],
     entry_points={
-        'console_scripts': 'empackage = empackage.empackage:main'
+        'console_scripts': 'empackage = empackage:main'
     },
 
     author='Hugo Castilho',
