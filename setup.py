@@ -6,7 +6,6 @@ setup(
     name="empackage",
     version="0.1",
     packages=find_packages(),
-    scripts=['empackage.py'],
     include_package_data=True,
     install_requires=[
         'Fabric>=1.9.1',
