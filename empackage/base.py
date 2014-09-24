@@ -47,6 +47,7 @@ class BasePackager(object):
         self.repo = conf.get('repo')
         self.branch = conf.get('branch', 'master')
         self.repo_type = conf.get('repo_type', 'git')
+        self.commit = conf.get('commit')
 
         self.deploy_key = conf.get('deploy_key')
         self.debian_scripts = conf.get('debian_scripts')
@@ -76,25 +77,23 @@ class BasePackager(object):
         # Setup deploy key
         self.setup_deploy_key()
 
-        if not update:
-            print 'Checking out project...'
-
-            # Clear/create app dir
-            sudo('rm -rf {}'.format(self.src_path))
-            sudo('mkdir -p {}'.format(self.src_path))
-            sudo('chown {0}.{0} {1}'.format(env.user, self.src_path))
-
-            # Clone repo
-            if self.repo_type == 'git':
-                _git_clone(self.repo, self.src_path, self.branch)
-            elif self.repo_type in ('hg', 'mercurial'):
-                _hg_clone(self.repo, self.src_path, self.branch)
-        else:
+        if update and not self.commit:
             print 'Updating project...'
             if self.repo_type == 'git':
                 _git_update(self.src_path)
             elif self.repo_type in ('hg', 'mercurial'):
                 _hg_update(self.src_path)
+        else:
+            print 'Checking out project...'
+            # Clear/create app dir
+            sudo('rm -rf {}'.format(self.src_path))
+            sudo('mkdir -p {}'.format(self.src_path))
+            sudo('chown {0}.{0} {1}'.format(env.user, self.src_path))
+            # Clone repo
+            if self.repo_type == 'git':
+                _git_clone(self.repo, self.src_path, self.branch)
+            elif self.repo_type in ('hg', 'mercurial'):
+                _hg_clone(self.repo, self.src_path, self.branch)
 
         if self.repo_type == 'git':
             self.commit = _current_git_commit(self.src_path)
@@ -174,13 +173,18 @@ def _current_hg_commit(src_path):
     pass
 
 
-def _git_clone(repo, src_path, branch='master'):
+def _git_clone(repo, src_path, branch='master', commit=None):
     run('git clone {} -b {} {}'
         .format(repo, branch, src_path))
+    if commit:
+        run('git checkout {}'.format(commit))
     _git_update(src_path)
 
 
-def _hg_clone(repo, src_path, branch='master'):
+def _hg_clone(repo, src_path, branch='master', commit=None):
+    if commit:
+        raise NotImplementedError( 'Selecting a commit for mercurial is not '
+                'supported yet')
     cmd = 'hg clone {}'.format(repo)
     if branch:
         cmd = '{}#{}'.format(cmd, branch)
@@ -196,4 +200,4 @@ def _git_update(src_path):
 
 
 def _hg_update(src_path):
-    pass
+    raise NotImplementedError('Updating mercurial repos is not supported yet')
