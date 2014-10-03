@@ -23,9 +23,11 @@ def vagrant(name=''):
 @click.option('--skip-packages', is_flag=True, help='Skip installing packages')
 @click.option('--update', is_flag=True, help='Clear app dir')
 @click.option('--download', '-d', is_flag=True, help='Download package')
+@click.option('--use_path', default=None,
+    help='Use local directory instead of repository')
 @click.argument('config', default='build.yml')
 @click.argument('packager', default='packager')
-def main(push, skip_packages, update, download, config, packager):
+def main(push, skip_packages, update, download, use_path, config, packager):
     """Build and package"""
     extension = os.path.splitext(config)[1]
     if extension in ('.yml', '.yaml'):
@@ -47,15 +49,17 @@ def main(push, skip_packages, update, download, config, packager):
     if packager.endswith('.py'):
         packager = packager[:-3]
 
-    execute(build, push, skip_packages, update, download, config, packager)
+    execute(
+        build,
+        push, skip_packages, update, download, use_path, config, packager)
 
 
-def build(push, skip_packages, update, download, config, packager):
+def build(push, skip_packages, update, download, use_path, config, packager):
     """Initiate fabric task to build package"""
     sys.path.insert(0, '.')
     packager = importlib.import_module(packager)
     pkgr = packager.Packager(config)
-    pkgr.prepare(skip_packages, update)
+    pkgr.prepare(skip_packages, update, use_path)
     pkgr.build_pkg(push=push, download=download)
 
     if push:

@@ -53,7 +53,7 @@ class BasePackager(object):
         self.debian_scripts = conf.get('debian_scripts')
 
 
-    def prepare(self, skip_packages=False, update=False):
+    def prepare(self, skip_packages=False, update=False, use_path=None):
         """Prepare system, install packages and fpm"""
 
         print 'Preparing...'
@@ -63,7 +63,13 @@ class BasePackager(object):
             sudo('apt-get install -qq {}'.format(' '.join(self.build_deps)))
             sudo('gem install fpm')
 
-        self.checkout_project(update)
+        if use_path:
+            #sudo('rm -rf {}'.format(self.src_path))
+            run('mkdir -p {}'.format(self.src_path))
+            put('{}/*'.format(use_path), self.src_path)
+        else:
+            self.checkout_project(update)
+
         self.build_project()
 
 
