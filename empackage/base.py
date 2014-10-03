@@ -140,7 +140,9 @@ class BasePackager(object):
                 if os.path.exists(os.path.join('debian', fname))
             )
             paths = '  '.join(self.pkg_paths)
-            fpm_output = run('fpm '
+            fpm_exec = 'fpm'
+            #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
+            fpm_output = run(fpm_exec + ' '
                 '-s dir '
                 '-t deb '
                 '-n {self.pkg_name} '
