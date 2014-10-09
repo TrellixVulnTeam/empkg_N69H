@@ -44,6 +44,7 @@ def main(push, skip_packages, update, download, use_path, config, packager):
     if config['target'] == 'vagrant':
         vagrant()
     else:
+        env.use_ssh_config = True
         env.hosts = [config['target'], ]
 
     if packager.endswith('.py'):

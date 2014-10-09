@@ -41,7 +41,13 @@ class BasePackager(object):
         self.make_opts = conf.get('make_opts', [])
         self.make_target = conf.get('make_target', [])
 
-        self.src_path = os.path.join(BASE_PATH, self.app_name)
+
+        self.prefix = self.conf.get('prefix')
+        self.src_path = self.conf.get('src_path')
+        if self.conf.get('inplace'):
+            self.src_path = self.conf.get('prefix')
+        else:
+            self.src_path = os.path.join(BASE_PATH, self.app_name)
         self.pkg_path = os.path.join(BASE_PATH, 'pkg')
 
         self.repo = conf.get('repo')
@@ -124,8 +130,15 @@ class BasePackager(object):
         run('mkdir -p {}'.format(self.pkg_path))
         with cd(self.pkg_path):
             # Debian installation scripts
-            put(local_path=self.debian_scripts,
-                remote_path=self.pkg_path)
+            for fname in os.listdir('debian'):
+                upload_template(
+                    join('debian', fname),
+                    join('debian', fname),
+                    {
+                        'prefix': self.prefix,
+                        conf: self.conf
+                    },
+                    use_jinja=True)
 
             deps_str = ('-d ' + ' -d '.join(self.run_deps)
                         if self.run_deps else '')
