@@ -1,0 +1,33 @@
+---
+
+app_name: example
+version: 1.0.0
+arch: native # all, native (uname -m) default: all
+vendor: Sapo
+license: Private
+maintainer: hugo.p.castilho@telecom.pt # defaults <username@host>
+homepage: http://homepage.com
+description: Very discriptive
+# Repo options
+repo: http://hg.nginx.org/nginx
+repo_type: hg
+branch: release-1.7.2 # Branch or tag name
+# More package
+hooks_dir: ./debian # install hooks directory default ./debian
+target: vagrant
+pkg_paths:
+- /servers/sapo-nginx/
+prefix: /servers/sapo-nginx # TODO python format config file would prevent this repetition
+build_deps:
+- ruby      # Used by fpm
+- ruby-dev  # Used by fpm
+- rubygems  # Used by fpm
+run_deps:
+- openssl
+# Make
+make_opts: # (not used in BasePackager)
+- --prefix=/servers/sapo-nginx
+make_target: install # (not used in BasePackager)
+# More package
+conffiles:
+- settings.py

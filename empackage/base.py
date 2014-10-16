@@ -3,7 +3,8 @@ Base class to create project packagers
 Projects should implement a class that inherits BasePackager and add any
 extra required build/packaging steps
 """
-import os
+from os import listdir
+from os.path import join, exists, basename
 from fabric.api import (
     settings,
     run,
@@ -16,6 +17,7 @@ from fabric.api import (
     get,
     hide,
 )
+from fabric.contrib.files import upload_template
 from fabtools.files import is_dir
 
 
@@ -33,48 +35,63 @@ class BasePackager(object):
         self.app_name = conf.get('app_name')
         self.pkg_name = self.app_name
         self.version = conf.get('version', '1.0')
-
+        self.arch = conf.get('arch', 'all')
+        self.vendor = conf.get('vendor', '')
+        self.license = conf.get('license', '')
+        self.maintainer = conf.get('maintainer', '')
+        self.homepage = conf.get('homepage', '')
+        self.description = conf.get('description', '')
         self.pkg_paths = conf.get('pkg_paths', [])
         self.build_deps = conf.get('build_deps', [])
         self.run_deps = conf.get('run_deps', [])
+        self.hooks_dir = conf.get('hooks_dir', 'debian')
+        self.conffiles = conf.get('conffiles', [])
 
+        # Make opts
         self.make_opts = conf.get('make_opts', [])
         self.make_target = conf.get('make_target', [])
 
 
+        # General opts
         self.prefix = self.conf.get('prefix')
-        self.src_path = self.conf.get('src_path')
-        if self.conf.get('inplace'):
+        if self.conf.get('src_path'):
+            self.src_path = self.conf.get('src_path')
+        elif self.conf.get('inplace'):
             self.src_path = self.conf.get('prefix')
         else:
-            self.src_path = os.path.join(BASE_PATH, self.app_name)
-        self.pkg_path = os.path.join(BASE_PATH, 'pkg')
+            self.src_path = join(BASE_PATH, self.app_name)
+        self.pkg_path = join(BASE_PATH, 'pkg')
 
+        # Repo opst
         self.repo = conf.get('repo')
         self.branch = conf.get('branch', 'master')
         self.repo_type = conf.get('repo_type', 'git')
         self.commit = conf.get('commit')
-
         self.deploy_key = conf.get('deploy_key')
-        self.debian_scripts = conf.get('debian_scripts')
 
 
-    def prepare(self, skip_packages=False, update=False, use_path=None):
+    def prepare(self, skip_build_deps=False, update=False, use_path=None):
         """Prepare system, install packages and fpm"""
 
         print 'Preparing...'
-        if self.build_deps and not skip_packages:
+        if self.build_deps and not skip_build_deps:
             print 'Installing packages...'
             sudo('apt-get update -qq')
             sudo('apt-get install -qq {}'.format(' '.join(self.build_deps)))
             sudo('gem install fpm')
 
+        sudo('mkdir -p {}'.format(self.prefix))
+        sudo('chown -R {} {}'.format(env.user, self.prefix))
+        run('mkdir -p {}'.format(self.src_path))
+        sudo('chown -R {} {}'.format(env.user, self.src_path))
+        sudo('echo {} > /servers/me'.format(env.user))
         if use_path:
             #sudo('rm -rf {}'.format(self.src_path))
-            run('mkdir -p {}'.format(self.src_path))
             put('{}/*'.format(use_path), self.src_path)
-        else:
+        elif self.repo:
             self.checkout_project(update)
+        else:
+            pass
 
         self.build_project()
 
@@ -129,30 +146,47 @@ class BasePackager(object):
         run('rm -rf {}'.format(self.pkg_path))
         run('mkdir -p {}'.format(self.pkg_path))
         with cd(self.pkg_path):
-            # Debian installation scripts
-            for fname in os.listdir('debian'):
+            # Vendor
+            vendor = ('--vendor {}'.format(self.vendor)
+                if self.vendor else '')
+            # License
+            license = ('--license {}'.format(self.license)
+                if self.license else '')
+            # Mantainer
+            maintainer = ('-m {}'.format(self.maintainer)
+                if self.maintainer else '')
+            # Homepage
+            homepage = ('--url {}'.format(self.homepage)
+                if self.homepage else '')
+            # Install hooks
+            run('mkdir -p {}'.format('hooks'))
+            for fname in listdir(self.hooks_dir):
                 upload_template(
-                    join('debian', fname),
-                    join('debian', fname),
-                    {
-                        'prefix': self.prefix,
-                        conf: self.conf
-                    },
+                    join(self.hooks_dir, fname),
+                    join('hooks', fname),
+                    self.get_context(),
                     use_jinja=True)
-
-            deps_str = ('-d ' + ' -d '.join(self.run_deps)
-                        if self.run_deps else '')
             hooks_str = ' '.join(
-                '{} debian/{}'.format(opt, fname)
+                '{} hooks/{}'.format(opt, fname)
                 for opt, fname in [
                     ('--before-remove', 'prerm'),
                     ('--after-remove', 'postrm'),
                     ('--before-install', 'preinst'),
                     ('--after-install', 'postinst'),
                 ]
-                if os.path.exists(os.path.join('debian', fname))
+                if exists(join(self.hooks_dir, fname))
             )
+            # Configuration files
+            pconffiles = (join(self.prefix, path) for path in self.conffiles)
+            conffiles = ('--config-files ' + ' --config-files '.join(pconffiles)
+                if self.conffiles else '')
+            # Dependencies
+            deps_str = ('-d ' + ' -d '.join(self.run_deps)
+                        if self.run_deps else '')
+            # Package paths
             paths = '  '.join(self.pkg_paths)
+
+            # TODO should be ignoring .git/ on fpm options
             fpm_exec = 'fpm'
             #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
             fpm_output = run(fpm_exec + ' '
@@ -160,21 +194,44 @@ class BasePackager(object):
                 '-t deb '
                 '-n {self.pkg_name} '
                 '-v {self.version} '
-                '-a all '
+                '-a {self.arch} '
+                '{vendor} '
+                '{license} '
+                '{maintainer} '
+                '{homepage} '
+                '--description "\nBranch: {self.branch} Commit: {self.commit}\n{self.description}" '
                 '-x "*.bak" -x "*.orig" -x ".git*" '
                 '{hooks} '
-                '--description '
-                '"Branch: {self.branch} Commit: {self.commit}" '
+                '{conffiles} '
                 '{deps} {paths}'
-                .format(self=self, hooks=hooks_str, deps=deps_str,
-                        paths=paths))
-            deb_name = os.path.basename(fpm_output.split('"')[-2])
+                .format(
+                    self=self,
+                    vendor=vendor,
+                    license=license,
+                    maintainer=maintainer,
+                    homepage=homepage,
+                    hooks=hooks_str,
+                    conffiles=conffiles,
+                    deps=deps_str,
+                    paths=paths,
+                )
+            )
+            deb_name = basename(fpm_output.split('"')[-2])
 
             if download:
                 get(deb_name, '%(basename)s')
             if push:
                 pass
 
+    def get_context(self, extra_context=None):
+        context = {
+            'prefix': self.prefix,
+        }
+        context.update(self.conf)
+        if extra_context:
+            context.update(extra_context)
+
+        return context
 
 def _current_git_branch(src_path):
     with cd(src_path):
