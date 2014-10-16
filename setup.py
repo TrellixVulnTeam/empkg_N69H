@@ -12,6 +12,7 @@ setup(
         'fabtools>=0.19.0',
         'PyYAML>=3.11',
         'click==3.2',
+        'jinja2>=2.7.3',
     ],
     entry_points={
         'console_scripts': [
