@@ -159,23 +159,25 @@ class BasePackager(object):
             homepage = ('--url {}'.format(self.homepage)
                 if self.homepage else '')
             # Install hooks
-            run('mkdir -p {}'.format('hooks'))
-            for fname in listdir(self.hooks_dir):
-                upload_template(
-                    join(self.hooks_dir, fname),
-                    join('hooks', fname),
-                    self.get_context(),
-                    use_jinja=True)
-            hooks_str = ' '.join(
-                '{} hooks/{}'.format(opt, fname)
-                for opt, fname in [
-                    ('--before-remove', 'prerm'),
-                    ('--after-remove', 'postrm'),
-                    ('--before-install', 'preinst'),
-                    ('--after-install', 'postinst'),
-                ]
-                if exists(join(self.hooks_dir, fname))
-            )
+            hooks_str = ''
+            if is_dir(self.hooks_dir):
+                run('mkdir -p {}'.format('hooks'))
+                for fname in listdir(self.hooks_dir):
+                    upload_template(
+                        join(self.hooks_dir, fname),
+                        join('hooks', fname),
+                        self.get_context(),
+                        use_jinja=True)
+                hooks_str = ' '.join(
+                    '{} hooks/{}'.format(opt, fname)
+                    for opt, fname in [
+                        ('--before-remove', 'prerm'),
+                        ('--after-remove', 'postrm'),
+                        ('--before-install', 'preinst'),
+                        ('--after-install', 'postinst'),
+                    ]
+                    if exists(join(self.hooks_dir, fname))
+                    )
             # Configuration files
             pconffiles = (join(self.prefix, path) for path in self.conffiles)
             conffiles = ('--config-files ' + ' --config-files '.join(pconffiles)
