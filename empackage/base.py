@@ -62,12 +62,15 @@ class BasePackager(object):
             self.src_path = join(BASE_PATH, self.app_name)
         self.pkg_path = join(BASE_PATH, 'pkg')
 
-        # Repo opst
+        # Repo opts
         self.repo = conf.get('repo')
         self.branch = conf.get('branch', 'master')
         self.repo_type = conf.get('repo_type', 'git')
         self.commit = conf.get('commit')
         self.deploy_key = conf.get('deploy_key')
+
+        # Package type
+        self.pkg_types = conf.get('pkg_types', 'deb').split(',')
 
 
     def prepare(self, skip_build_deps=False, update=False, use_path=None):
@@ -191,39 +194,42 @@ class BasePackager(object):
             # TODO should be ignoring .git/ on fpm options
             fpm_exec = 'fpm'
             #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
-            fpm_output = run(fpm_exec + ' '
-                '-s dir '
-                '-t deb '
-                '-n {self.pkg_name} '
-                '-v {self.version} '
-                '-a {self.arch} '
-                '{vendor} '
-                '{license} '
-                '{maintainer} '
-                '{homepage} '
-                '--description "\nBranch: {self.branch} Commit: {self.commit}\n{self.description}" '
-                '-x "*.bak" -x "*.orig" -x ".git*" '
-                '{hooks} '
-                '{conffiles} '
-                '{deps} {paths}'
-                .format(
-                    self=self,
-                    vendor=vendor,
-                    license=license,
-                    maintainer=maintainer,
-                    homepage=homepage,
-                    hooks=hooks_str,
-                    conffiles=conffiles,
-                    deps=deps_str,
-                    paths=paths,
-                )
-            )
-            deb_name = basename(fpm_output.split('"')[-2])
 
-            if download:
-                get(deb_name, '%(basename)s')
-            if push:
-                pass
+            for pkg_type in self.pkg_types:
+                fpm_output = run(fpm_exec + ' '
+                    '-s dir '
+                    '-t {pkg_type} '
+                    '-n {self.pkg_name} '
+                    '-v {self.version} '
+                    '-a {self.arch} '
+                    '{vendor} '
+                    '{license} '
+                    '{maintainer} '
+                    '{homepage} '
+                    '--description "\nBranch: {self.branch} Commit: {self.commit}\n{self.description}" '
+                    '-x "*.bak" -x "*.orig" -x ".git*" '
+                    '{hooks} '
+                    '{conffiles} '
+                    '{deps} {paths}'
+                    .format(
+                        self=self,
+                        pkg_type=pkg_type,
+                        vendor=vendor,
+                        license=license,
+                        maintainer=maintainer,
+                        homepage=homepage,
+                        hooks=hooks_str,
+                        conffiles=conffiles,
+                        deps=deps_str,
+                        paths=paths,
+                    )
+                )
+                deb_name = basename(fpm_output.split('"')[-2])
+
+                if download:
+                    get(deb_name, '%(basename)s')
+                if push:
+                    pass
 
     def get_context(self, extra_context=None):
         context = {
