@@ -196,7 +196,7 @@ class BasePackager(object):
             #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
 
             for pkg_type in self.pkg_types:
-                fpm_output = run(fpm_exec + ' '
+                cmd = (fpm_exec + ' '
                     '-s dir '
                     '-t {pkg_type} '
                     '-n {self.pkg_name} '
@@ -222,8 +222,8 @@ class BasePackager(object):
                         conffiles=conffiles,
                         deps=deps_str,
                         paths=paths,
-                    )
-                )
+                    ))
+                fpm_output = run(cmd)
                 deb_name = basename(fpm_output.split('"')[-2])
 
                 if download:
