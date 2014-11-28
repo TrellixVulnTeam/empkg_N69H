@@ -4,7 +4,7 @@ Projects should implement a class that inherits BasePackager and add any
 extra required build/packaging steps
 """
 from os import listdir
-from os.path import join, exists, basename
+from os.path import join, exists, basename, isdir, isfile
 from fabric.api import (
     settings,
     run,
@@ -18,7 +18,7 @@ from fabric.api import (
     hide,
 )
 from fabric.contrib.files import upload_template
-from fabtools.files import is_dir
+from fabtools.files import is_dir, is_file
 
 
 BASE_PATH = "/tmp/"
@@ -28,12 +28,49 @@ class BasePackager(object):
     Base class to create project packagers
     Projects should implement a class that inherits BasePackager and add any
     extra required build/packaging steps
+
+    Package Options:
+    app_name -- Application name, used to name the package
+    pkg_type -- Comma sepparated list of package types to produce (default 'deb')
+    pkg_dest -- Where to place the package (default '/tmp/pkg/')
+    version -- Package version (default 1.0)
+    arch -- Architecture (default 'all')
+    vendor -- Vendor (default '')
+    license
+    maintainer
+    homepage
+    description
+    changelog -- Changelog file
+    pkg_src_paths -- Aditional (besides prefix) paths that sould be included in
+                the package
+    build_deps -- Build dependencies
+    run_depes -- Package runtime dependencies
+    hooks_dir -- Path to install hooks
+    config_files -- Mark files as configuration
+
+    Repository Options:
+    repo -- Repository URL
+    repo_type -- Repository type (defaults 'git')
+    branch -- Branch to checkout (defaults 'master')
+    commit -- Commit to checkout (defaults 'HEAD')
+    deploy_key -- Key to checkout repository
+
+    Build Options:
+    prefix -- Project prefix, relative paths will start here
+    src_path -- Where to place project src (defaults '/tmp/<app_name>')
+    inplace -- If set project is moved directly to prefix
+    make_opts -- Make options (to use in self.build_project)
+    make_target -- Make target (to use in self.build_project)
+
+
     """
     def __init__(self, conf):
         self.conf = conf
-
+        # Package Options
         self.app_name = conf.get('app_name')
         self.pkg_name = self.app_name
+        self.pkg_types = conf.get('pkg_types', 'deb').split(',')
+        self.pkg_path = join(BASE_PATH, 'pkg', self.app_name)
         self.version = conf.get('version', '1.0')
         self.arch = conf.get('arch', 'all')
         self.vendor = conf.get('vendor', '')
@@ -41,18 +78,16 @@ class BasePackager(object):
         self.maintainer = conf.get('maintainer', '')
         self.homepage = conf.get('homepage', '')
         self.description = conf.get('description', '')
-        self.pkg_paths = conf.get('pkg_paths', [])
+        self.changelog = conf.get('changelog', '')
+        self.pkg_src_paths = conf.get('pkg_src_paths', [])
         self.build_deps = conf.get('build_deps', [])
         self.run_deps = conf.get('run_deps', [])
         self.hooks_dir = conf.get('hooks_dir', 'debian')
-        self.conffiles = conf.get('conffiles', [])
-
-        # Make opts
+        self.config_files = conf.get('config_files', [])
+        self.tmp_remote_dir = join(BASE_PATH, 'tmp_{}'.format(self.app_name))
+        # Build Options
         self.make_opts = conf.get('make_opts', [])
         self.make_target = conf.get('make_target', [])
-
-
-        # General opts
         self.prefix = self.conf.get('prefix')
         if self.conf.get('src_path'):
             self.src_path = self.conf.get('src_path')
@@ -60,49 +95,39 @@ class BasePackager(object):
             self.src_path = self.conf.get('prefix')
         else:
             self.src_path = join(BASE_PATH, self.app_name)
-        self.pkg_path = join(BASE_PATH, 'pkg')
-
-        # Repo opts
+        # Repo Options
         self.repo = conf.get('repo')
-        self.branch = conf.get('branch', 'master')
         self.repo_type = conf.get('repo_type', 'git')
+        self.branch = conf.get('branch', 'master')
         self.commit = conf.get('commit')
         self.deploy_key = conf.get('deploy_key')
 
-        # Package type
-        self.pkg_types = conf.get('pkg_types', 'deb').split(',')
-
-
     def prepare(self, skip_build_deps=False, update=False, use_path=None):
         """Prepare system, install packages and fpm"""
-
         print 'Preparing...'
         if self.build_deps and not skip_build_deps:
             print 'Installing packages...'
             sudo('apt-get update -qq')
             sudo('apt-get install -qq {}'.format(' '.join(self.build_deps)))
             sudo('gem install fpm')
-
+        # Create root dir
         sudo('mkdir -p {}'.format(self.prefix))
         sudo('chown -R {} {}'.format(env.user, self.prefix))
+        # Create dir for project src
         run('mkdir -p {}'.format(self.src_path))
         sudo('chown -R {} {}'.format(env.user, self.src_path))
-        sudo('echo {} > /servers/me'.format(env.user))
         if use_path:
-            #sudo('rm -rf {}'.format(self.src_path))
+            # Use local path instead of a repo
             put('{}/*'.format(use_path), self.src_path)
         elif self.repo:
             self.checkout_project(update)
         else:
             pass
-
         self.build_project()
-
 
     def build_project(self):
         """Packagers need to implement the build step themselves"""
         raise NotImplementedError
-
 
     def checkout_project(self, update=False):
         """Checkout/update project from repository"""
@@ -132,7 +157,6 @@ class BasePackager(object):
         elif self.repo_type in ('hg', 'mercurial'):
             self.commit = _current_hg_commit(self.src_path)
 
-
     def setup_deploy_key(self):
         """Setup deploy key"""
         if self.deploy_key:
@@ -141,95 +165,138 @@ class BasePackager(object):
                     run('mkdir ~/.ssh')
             put(self.deploy_key, '~/.ssh/id_rsa', mirror_local_mode=True)
 
-
     def build_pkg(self, push=False, download=True):
         """Build package"""
         print 'Building package...'
-
         run('rm -rf {}'.format(self.pkg_path))
         run('mkdir -p {}'.format(self.pkg_path))
+        run('mkdir -p {}'.format(self.tmp_remote_dir))
+
         with cd(self.pkg_path):
-            # Vendor
-            vendor = ('--vendor {}'.format(self.vendor)
-                if self.vendor else '')
-            # License
-            license = ('--license {}'.format(self.license)
-                if self.license else '')
-            # Mantainer
-            maintainer = ('-m {}'.format(self.maintainer)
-                if self.maintainer else '')
-            # Homepage
-            homepage = ('--url {}'.format(self.homepage)
-                if self.homepage else '')
-            # Install hooks
-            hooks_str = ''
-            if is_dir(self.hooks_dir):
-                run('mkdir -p {}'.format('hooks'))
-                for fname in listdir(self.hooks_dir):
-                    upload_template(
-                        join(self.hooks_dir, fname),
-                        join('hooks', fname),
-                        self.get_context(),
-                        use_jinja=True)
-                hooks_str = ' '.join(
-                    '{} hooks/{}'.format(opt, fname)
-                    for opt, fname in [
-                        ('--before-remove', 'prerm'),
-                        ('--after-remove', 'postrm'),
-                        ('--before-install', 'preinst'),
-                        ('--after-install', 'postinst'),
-                    ]
-                    if exists(join(self.hooks_dir, fname))
-                    )
-            # Configuration files
-            pconffiles = (join(self.prefix, path) for path in self.conffiles)
-            conffiles = ('--config-files ' + ' --config-files '.join(pconffiles)
-                if self.conffiles else '')
-            # Dependencies
-            deps_str = ('-d ' + ' -d '.join(self.run_deps)
-                        if self.run_deps else '')
-            # Package paths
-            paths = '  '.join(self.pkg_paths)
-
-            # TODO should be ignoring .git/ on fpm options
-            fpm_exec = 'fpm'
-            #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
-
+            self.copy_hooks()
+            self.copy_changelog()
             for pkg_type in self.pkg_types:
-                cmd = (fpm_exec + ' '
-                    '-s dir '
-                    '-t {pkg_type} '
-                    '-n {self.pkg_name} '
-                    '-v {self.version} '
-                    '-a {self.arch} '
-                    '{vendor} '
-                    '{license} '
-                    '{maintainer} '
-                    '{homepage} '
-                    '--description "\nBranch: {self.branch} Commit: {self.commit}\n{self.description}" '
-                    '-x "*.bak" -x "*.orig" -x ".git*" '
-                    '{hooks} '
-                    '{conffiles} '
-                    '{deps} {paths}'
-                    .format(
-                        self=self,
-                        pkg_type=pkg_type,
-                        vendor=vendor,
-                        license=license,
-                        maintainer=maintainer,
-                        homepage=homepage,
-                        hooks=hooks_str,
-                        conffiles=conffiles,
-                        deps=deps_str,
-                        paths=paths,
-                    ))
+                cmd = self.get_fpm_cmd(pkg_type)
                 fpm_output = run(cmd)
                 deb_name = basename(fpm_output.split('"')[-2])
 
                 if download:
                     get(deb_name, '%(basename)s')
                 if push:
+                    # TODO push to package repository
                     pass
+
+    def get_fpm_cmd(self, pkg_type):
+        fpm_exec = 'fpm'
+        #fpm_exec = '/var/lib/gems/1.8/bin/fpm' # for deb6 need to solve this
+        cmd = (fpm_exec + ' '
+            '-s dir '
+            '-t {pkg_type} '
+            '-n {self.pkg_name} '
+            '-v {self.version} '
+            '-a {self.arch} '
+            '{vendor} '
+            '{license} '
+            '{maintainer} '
+            '{homepage} '
+            '--description "{self.description}" '
+            '-x "**/*.bak" -x "**/*.orig" -x "**/.git*" '
+            '{changelog} '
+            '{hooks} '
+            '{config_files} '
+            '{deps} {paths}'
+            .format(
+                self=self,
+                pkg_type=pkg_type,
+                vendor=self.get_vendor_arg(),
+                license=self.get_license_arg(),
+                maintainer=self.get_maintainer_arg(),
+                homepage=self.get_homepage_arg(),
+                hooks=self.get_hooks_arg(),
+                changelog = self.get_changelog_arg(pkg_type),
+                config_files=self.get_config_files_arg(),
+                deps=self.get_dependencies_arg(),
+                paths=self.get_package_paths_arg(),
+            ))
+        return cmd
+
+    def get_changelog_arg(self, pkg_type):
+        changelog_file = join(self.tmp_remote_dir, 'changelog')
+        if not is_file(changelog_file):
+            return ''
+        if pkg_type == 'deb':
+            arg = '--deb-changelog '
+        elif pkg_type == 'rpm':
+            arg = '--rpm-changelog '
+        return arg + changelog_file
+
+    def copy_changelog(self):
+        if 'changelog' in self.conf and isfile(self.conf.get('changelog')):
+            upload_template(
+                self.conf['changelog'],
+                join(self.tmp_remote_dir, 'changelog'),
+                self.get_context(),
+                use_jinja=True)
+        elif self.conf.get('changelog', False) == True:
+            # TODO automatic changelog
+            pass
+
+    def get_vendor_arg(self):
+        arg = ('--vendor {}'.format(self.vendor) if self.vendor else '')
+        return arg
+
+    def get_license_arg(self):
+        arg = ('--license {}'.format(self.license) if self.license else '')
+        return arg
+
+    def get_maintainer_arg(self):
+        arg = ('-m {}'.format(self.maintainer) if self.maintainer else '')
+        return arg
+
+    def get_homepage_arg(self):
+        arg = ('--url {}'.format(self.homepage) if self.homepage else '')
+        return arg
+
+    def get_config_files_arg(self):
+        paths = (join(self.prefix, path) for path in self.config_files)
+        arg = ('--config-files ' + ' --config-files '.join(paths)
+            if self.config_files else '')
+        return arg
+
+    def get_dependencies_arg(self):
+        arg = ('-d "' + '" -d "'.join(self.run_deps) + '"' if self.run_deps else '')
+        return arg
+
+    def get_package_paths_arg(self):
+        paths = [self.prefix]
+        paths.extend(self.pkg_src_paths)
+        return ' '.join(paths)
+
+    def get_hooks_arg(self):
+        hooks_str = ''
+        if not isdir(self.hooks_dir):
+            return ''
+        hooks_str = ' '.join(
+            '{} {}/{}'.format(opt, self.tmp_remote_dir, fname)
+            for opt, fname in [
+                ('--before-remove', 'prerm'),
+                ('--after-remove', 'postrm'),
+                ('--before-install', 'preinst'),
+                ('--after-install', 'postinst'),
+            ]
+            if exists(join(self.hooks_dir, fname))
+            )
+        return hooks
+
+    def copy_hooks(self):
+        if not isdir(self.hooks_dir):
+            return
+        for fname in listdir(self.hooks_dir):
+            upload_template(
+                join(self.hooks_dir, fname),
+                join(self.tmp_remote_dir, fname),
+                self.get_context(),
+                use_jinja=True)
 
     def get_context(self, extra_context=None):
         context = {
@@ -238,8 +305,8 @@ class BasePackager(object):
         context.update(self.conf)
         if extra_context:
             context.update(extra_context)
-
         return context
+
 
 def _current_git_branch(src_path):
     with cd(src_path):

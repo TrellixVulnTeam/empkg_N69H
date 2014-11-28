@@ -15,9 +15,7 @@ branch: release-1.7.2 # Branch or tag name
 # More package
 hooks_dir: ./debian # install hooks directory default ./debian
 target: vagrant
-pkg_paths:
-- /servers/sapo-nginx/
-prefix: /servers/sapo-nginx # TODO python format config file would prevent this repetition
+prefix: /servers/sapo-nginx
 build_deps:
 - ruby      # Used by fpm
 - ruby-dev  # Used by fpm
@@ -29,5 +27,5 @@ make_opts: # (not used in BasePackager)
 - --prefix=/servers/sapo-nginx
 make_target: install # (not used in BasePackager)
 # More package
-conffiles:
+config_files:
 - settings.py
