@@ -177,7 +177,7 @@ class BasePackager(object):
             self.copy_changelog()
             for pkg_type in self.pkg_types:
                 cmd = self.get_fpm_cmd(pkg_type)
-                fpm_output = run(cmd)
+                fpm_output = sudo(cmd)
                 deb_name = basename(fpm_output.split('"')[-2])
 
                 if download:
@@ -200,7 +200,7 @@ class BasePackager(object):
             '{maintainer} '
             '{homepage} '
             '--description "{self.description}" '
-            '-x "**/*.bak" -x "**/*.orig" -x "**/.git*" '
+            '-x "**/*.bak" -x "**/*.orig" -x "**/.git*" -x "**/.hg*" '
             '{changelog} '
             '{hooks} '
             '{config_files} '
@@ -286,7 +286,7 @@ class BasePackager(object):
             ]
             if exists(join(self.hooks_dir, fname))
             )
-        return hooks
+        return hooks_str
 
     def copy_hooks(self):
         if not isdir(self.hooks_dir):
@@ -345,9 +345,9 @@ def _hg_clone(repo, src_path, branch='master', commit=None):
     run(cmd)
 
 
-def _git_update(src_path):
+def _git_update(src_path, remote='origin', branch='master'):
     with cd(src_path):
-        run('git pull')
+        run('git pull {} {}'.format(remote, branch))
         run('git submodule init')
         run('git submodule update')
 
