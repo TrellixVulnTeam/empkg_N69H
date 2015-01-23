@@ -22,7 +22,7 @@ setup(
 
     author='Hugo Castilho',
     author_email='hugo.p.castilho@telecom.pt',
-    url='https://gitlab.intra.sapo.pt/security/empackage'
+    url='https://gitlab.intra.sapo.pt/security/empackage',
     description='Wrapper for fpm to produce native packages',
     keywords=['package', 'fpm'],
     long_description="""
