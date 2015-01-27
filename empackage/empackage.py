@@ -25,9 +25,19 @@ def vagrant(name=''):
 @click.option('--download', '-d', is_flag=True, help='Download package')
 @click.option('--use_path', default=None,
     help='Use local directory instead of repository')
+@click.option('--target', '-t', default=None, help='Set/Override build target')
 @click.argument('config', default='build.yml')
 @click.argument('packager', default='packager')
-def main(push, skip_build_deps, update, download, use_path, config, packager):
+def main(
+        push,
+        skip_build_deps,
+        update,
+        download,
+        use_path,
+        target,
+        config,
+        packager
+    ):
     """Build and package"""
     extension = os.path.splitext(config)[1]
     if extension in ('.yml', '.yaml'):
@@ -41,11 +51,18 @@ def main(push, skip_build_deps, update, download, use_path, config, packager):
             'No loader defined for filetype {}'.format(extension)
         )
 
-    if config['target'] == 'vagrant':
+    if 'target' not in config and target is None:
+        print 'Build target must be defined either in the config or the cmd line'
+        sys.exit(1)
+
+    if 'target' in config and config['target'] == 'vagrant':
         vagrant()
     else:
         env.use_ssh_config = True
-        env.hosts = [config['target'], ]
+        if target is not None:
+            env.hosts = [target, ]
+        else:
+            env.hosts = [config['target'], ]
 
     if packager.endswith('.py'):
         packager = packager[:-3]
