@@ -4,7 +4,7 @@ Projects should implement a class that inherits BasePackager and add any
 extra required build/packaging steps
 """
 from os import listdir
-from os.path import join, exists, basename, isdir, isfile
+from os.path import join, exists, basename, isdir, isfile, abspath, dirname
 from fabric.api import (
     settings,
     run,
@@ -111,6 +111,7 @@ class BasePackager(object):
             sudo('apt-get install -qq {}'.format(' '.join(self.build_deps)))
             sudo('gem install fpm')
         # Create root dir
+        # TODO optional clear or prefix and src_path
         sudo('mkdir -p {}'.format(self.prefix))
         sudo('chown -R {} {}'.format(env.user, self.prefix))
         # Create dir for project src
@@ -232,10 +233,12 @@ class BasePackager(object):
 
     def copy_changelog(self):
         if 'changelog' in self.conf and isfile(self.conf.get('changelog')):
+            chglog = abspath(self.conf['changelog'])
             upload_template(
-                self.conf['changelog'],
-                join(self.tmp_remote_dir, 'changelog'),
-                self.get_context(),
+                filename=basename(chglog),
+                destination=join(self.tmp_remote_dir, 'changelog'),
+                template_dir=dirname(chglog),
+                context=self.get_context(),
                 use_jinja=True)
         elif self.conf.get('changelog', False) == True:
             # TODO automatic changelog
