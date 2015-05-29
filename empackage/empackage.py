@@ -7,7 +7,7 @@ import sys
 
 import yaml
 from fabric.api import env, execute
-from fabric.api import sudo
+from fabric.api import sudo, get, put, cd, local
 from fabtools.vagrant import ssh_config, _settings_dict
 
 
@@ -221,8 +221,8 @@ def build(config):
             sudo('apt-get install -qq {}'.format(' '.join(build_deps)))
         sudo('gem install fpm')
 
-    get = config.pop('get')
-    push = config.pop('push')
+    get_pkg = config.pop('get')
+    push_pkg = config.pop('push')
     profile = config.get('profile')
     if profile:
         if profile == 'python':
@@ -237,11 +237,16 @@ def build(config):
     packager.build()
     packager.makepkg()
 
-    if get:
-        get(packager.deb_name, '%(basename)s')
-    if push:
+    if get_pkg:
+        with cd(packager.conf['tmp_remote_dir']):
+            get(packager.pkg_name, '%(basename)s')
+    if push_pkg:
+        # TODO improve
+        with cd(packager.conf['tmp_remote_dir']):
+            get(packager.pkg_name, '/tmp')
         pkg_repo = config.pop('pkg_repo')
-        run('scp {} {}'.format(packager.pkg_name, pkg_repo))
+        local('scp {} {}'.format(os.path.join('/tmp', packager.pkg_name), pkg_repo))
+        local('rm /tmp/{}'.format(packager.pkg_name))
 
 
 if __name__ == '__main__':

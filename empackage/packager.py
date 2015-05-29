@@ -42,6 +42,8 @@ class BasePackager(object):
         conf['inplace'] = conf.get('inplace', False)
         if conf['inplace']:
             conf['src_path'] = conf.get('prefix')
+        elif conf.get('src_path'):
+            pass
         else:
             conf['src_path'] = join(BASE_PATH, conf['name'])
 
@@ -53,26 +55,27 @@ class BasePackager(object):
     def prepare(self):
         """Prepare system, install packages and fpm"""
         print 'Preparing...'
-        # Prepare prefix dir
-        if self.conf['prefix']:
-            sudo('mkdir -p {}'.format(self.conf['prefix']))
-
         # Clean paths where our package will be installed
         if not self.conf.get('no_clean_pkg_paths'):
             if '/' in self.conf['pkg_paths']:
                 print '/ in pkg_paths, you do not want to do that'
                 sys.exit(1)
             sudo('rm -rf {}'.format(' '.join(self.conf['pkg_paths'])))
+            sudo('mkdir -p {}'.format(' '.join(self.conf['pkg_paths'])))
+            sudo('chown -R {} {}'.format(env.user, ' '.join(self.conf['pkg_paths'])))
 
         # Clean temp dir
         sudo('rm -rf {}'.format(self.conf['tmp_remote_dir']))
         run('mkdir -p {}'.format(self.conf['tmp_remote_dir']))
+        sudo('chown -R {} {}'.format(env.user, self.conf['tmp_remote_dir']))
 
-        # Prepare project source
+        # Prepare source dir
         if not self.conf.get('no_clean_checkout'):
             sudo('rm -rf {}'.format(self.conf['src_path']))
-        run('mkdir -p {}'.format(self.conf['src_path']))
-        sudo('chown -R {} {}'.format(env.user, self.conf['src_path']))
+            run('mkdir -p {}'.format(self.conf['src_path']))
+            sudo('chown -R {} {}'.format(env.user, self.conf['src_path']))
+
+        # Place source code
         if self.conf.get('src'):
             put('{}/*'.format(self.conf['src']), self.conf['src_path'])
         else:
@@ -115,7 +118,7 @@ class BasePackager(object):
                     run('mkdir ~/.ssh')
             put(self.conf['deploy_key'], '~/.ssh/id_rsa', mirror_local_mode=True)
 
-    def makepkg(self, push=False, download=True):
+    def makepkg(self):
         """Build package"""
         print 'Building package...'
 
@@ -124,7 +127,7 @@ class BasePackager(object):
             self.copy_changelog()
             cmd = self.get_fpm_cmd()
             fpm_output = sudo(cmd)
-            deb_name = basename(fpm_output.split('"')[-2])
+            self.pkg_name = basename(fpm_output.split('"')[-2])
 
     def get_fpm_cmd(self):
         fpm_exec = 'fpm'
