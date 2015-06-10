@@ -1,14 +1,40 @@
 # Empackage
 
-Wrapper around the fpm project to automate the workflow of producing a package.
+## Overview
+
+Wrapper around the fpm project to automate the workflow of producing system
+packages.
 Inspired by the [Python Application Deployment with Native Packages]
 (https://hynek.me/articles/python-app-deployment-with-native-packages/) article.
 
-## Usage
+
+## Installation
+
+Install using `pip`...
+```
+pip install empackage
+```
+
+User settings can be placed in the user home under `~/.empackage`, example:
 
 ```
-empackage.py build.yml packager
+
+---
+
+target: <build vm hostname>
+pkg_repo: <scp style path to repo>
 ```
-The empackage command line tools receives a yaml file that specifies the
-project options and the a python module that extends the BasePackager class
-and implements the project build.
+
+## Usage
+
+Create a directory for the package settings/files and generate a configuration
+skeleton.
+```
+mkdir packager
+cd packager
+empackage --gen-config > build.yaml
+```
+By default install hooks sould be located in the `hooks` directory and files
+that should be copied to over in the `templates` directory.
+
+

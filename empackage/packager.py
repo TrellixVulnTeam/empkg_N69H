@@ -4,13 +4,14 @@ Projects should implement a class that inherits BasePackager and add any
 extra required build/packaging steps
 """
 import sys
-from os import listdir
+import os
 from os.path import join, exists, basename, isdir, isfile, abspath, dirname
 
 from fabric.api import (
     settings,
     run,
     local,
+    lcd,
     cd,
     env,
     sudo,
@@ -31,14 +32,23 @@ class BasePackager(object):
     Projects should implement a class that inherits BasePackager and add any
     extra required build/packaging steps
     """
+
+    template_dir = './templates'
+
     def __init__(self, conf):
         conf['arch'] = conf.get('arch', 'all')
         conf['repo_type'] = conf.get('repo_type', 'git')
         conf['pkg_type'] = conf.get('pkg_type', 'deb')
         if not conf.get('pkg_paths'):
             conf['pkg_paths'] = [conf['prefix']]
-        conf['hooks_dir'] = conf.get('hooks_dir', 'debian')
-        conf['config_files'] = conf.get('config_files', [])
+        else:
+            conf['pkg_paths'] = [join(conf['prefix'], path)
+                    for path in conf.get('pkg_paths', [])]
+        conf['hooks_dir'] = conf.get('hooks_dir', 'hooks')
+        conf['config_files'] = [join(conf['prefix'], path)
+                for path in conf.get('config_files', [])]
+        conf['extra_dirs'] = [join(conf['prefix'], path)
+                for path in conf.get('extra_dirs', [])]
         conf['inplace'] = conf.get('inplace', False)
         if conf['inplace']:
             conf['src_path'] = conf.get('prefix')
@@ -55,6 +65,7 @@ class BasePackager(object):
     def prepare(self):
         """Prepare system, install packages and fpm"""
         print 'Preparing...'
+
         # Clean paths where our package will be installed
         if not self.conf.get('no_clean_pkg_paths'):
             if '/' in self.conf['pkg_paths']:
@@ -66,20 +77,45 @@ class BasePackager(object):
 
         # Clean temp dir
         sudo('rm -rf {}'.format(self.conf['tmp_remote_dir']))
-        run('mkdir -p {}'.format(self.conf['tmp_remote_dir']))
+        sudo('mkdir -p {}'.format(self.conf['tmp_remote_dir']))
         sudo('chown -R {} {}'.format(env.user, self.conf['tmp_remote_dir']))
 
         # Prepare source dir
         if not self.conf.get('no_clean_checkout'):
             sudo('rm -rf {}'.format(self.conf['src_path']))
-            run('mkdir -p {}'.format(self.conf['src_path']))
+            sudo('mkdir -p {}'.format(self.conf['src_path']))
             sudo('chown -R {} {}'.format(env.user, self.conf['src_path']))
 
         # Place source code
         if self.conf.get('src'):
             put('{}/*'.format(self.conf['src']), self.conf['src_path'])
-        else:
+        elif self.conf.get('repo'):
             self.checkout_project()
+
+        # Copy templates
+        if os.path.isdir(self.template_dir):
+            oldpwd = os.getcwd()
+            os.chdir(self.template_dir)
+            for dirpath, dirnames, filenames in os.walk('.'):
+                sudo('mkdir -p %s' % join(self.conf['prefix'], dirpath))
+                sudo('chown -R {} {}'.format(
+                    env.user,
+                    join(self.conf['prefix'], dirpath)))
+                for filename in filenames:
+                    upload_template(
+                        join(dirpath, filename),
+                        join(self.conf['prefix'], dirpath, filename),
+                        self.get_context(),
+                        use_jinja=True,
+                        mirror_local_mode=True,
+                        )
+            os.chdir(oldpwd)
+
+        # Create extra dirs
+        for d in self.conf.get('extra_dirs', []):
+            run('mkdir -p {}'.format(d))
+            sudo('chown -R {} {}'.format(env.user, d))
+
 
     def build(self):
         """Packagers need to implement the build step themselves"""
@@ -101,9 +137,13 @@ class BasePackager(object):
         else:
             print 'Checking out project...'
             if self.conf['repo_type'] == 'git':
-                _git_clone(self.conf['repo'], self.conf['src_path'], self.conf.get('branch'))
+                _git_clone(self.conf['repo'],
+                        self.conf['src_path'],
+                        self.conf.get('branch', 'master'))
             elif self.conf['repo_type'] in ('hg', 'mercurial'):
-                _hg_clone(self.conf['repo'], self.conf['src_path'], self.conf.get('branch'))
+                _hg_clone(self.conf['repo'],
+                        self.conf['src_path'],
+                        self.conf.get('branch', 'default'))
 
         if self.conf['repo_type'] == 'git':
             self.conf['commit'] = _current_git_commit(self.conf['src_path'])
@@ -211,8 +251,8 @@ class BasePackager(object):
     def get_config_files_arg(self):
         if not self.conf['config_files']:
             return ''
-        paths = (join(self.conf['prefix'], path) for path in self.conf['config_files'])
-        return '--config-files ' + ' --config-files '.join(paths)
+        return '--config-files ' + \
+                ' --config-files '.join(self.conf['config_files'])
 
     def get_dependencies_arg(self):
         arg = ('-d "' + '" -d "'.join(self.conf['run_deps']) + '"'
@@ -239,7 +279,7 @@ class BasePackager(object):
     def copy_hooks(self):
         if not isdir(self.conf['hooks_dir']):
             return
-        for fname in listdir(self.conf['hooks_dir']):
+        for fname in os.listdir(self.conf['hooks_dir']):
             upload_template(
                 join(self.conf['hooks_dir'], fname),
                 join(self.conf['tmp_remote_dir'], fname),
@@ -254,6 +294,18 @@ class BasePackager(object):
         if extra_context:
             context.update(extra_context)
         return context
+
+
+class PythonPackager(BasePackager):
+    def build(self):
+        with cd(self.conf['prefix']):
+            if self.conf.get('python_virtualenv', True):
+                run('virtualenv .')
+                run('./bin/pip install {}'
+                        .format(' '.join(self.conf.get('python_requires'))))
+            else:
+                sudo('./bin/pip install {}'
+                        .format(' '.join(self.conf.get('python_requires'))))
 
 
 def _current_git_branch(src_path):

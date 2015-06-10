@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+
 """Commnad line tool to build a package"""
 import argparse
 import importlib
@@ -10,9 +11,8 @@ from fabric.api import env, execute
 from fabric.api import sudo, get, put, cd, local
 from fabtools.vagrant import ssh_config, _settings_dict
 
-
-# TODO create profiles ex: python, make and use PythonPackager, MakePackager
-
+EXIT_OK = 0
+EXIT_FAILED = 1
 
 def vagrant(name=''):
     """Setup fabric to use vagrant"""
@@ -69,6 +69,7 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 
 # Package config
 ###################################
+# Note: Any file/dir in the templates directory will be copied to the package
 # Package format (ex: deb, rpm)
 #pkg_type: deb
 # Paths (dir or file) to include in the package, defaults to prefix
@@ -77,11 +78,11 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 #hooks_dir: debian
 # Paths to config files, relative paths start from prefix
 #config_files:
+# Extra directories to create
+# extra_dirs
 
 # Build config
 ###################################
-# Use predifined build profile (ex: python, make), optional
-#profile:
 # Make cmd prefix, also used for relative paths
 #prefix:
 # Build dependencies
@@ -92,9 +93,16 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 #src_path: /tmp/<pkg_name>
 # Place project directly on <prefix>
 #inplace: False
-# Make options
+# Use predifined build profile (ex: python, make), optional
+#profile:
+# Python requires, `python` profile, optional
+#python_requires:
+# Python virtualenv, `python` profile
+#python_virtualenv: True
+#python_requires:
+# Make options, `make` profile, optional
 #make_opts:
-# Make target
+# Make target, `make` profile, optional
 # make_target: install
 
 # Extra vars
@@ -103,52 +111,56 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 # implementation
 
 """
-def main():
-    parser = argparse.ArgumentParser('Commnad line tool for compiling and building packages')
-    parser.add_argument('--config',
-            default='build.yml',
-            help='Select a diferent config file')
-    parser.add_argument('--packager',
-            default='packager',
-            help='Select a diferent custom packager module')
-    parser.add_argument('--pythonpath',
-            default='',
-            help='Add to python path')
-    parser.add_argument('--gen-config',
-            action='store_true',
-            help='Create example config file')
 
-    parser.add_argument('--get',
-            action='store_true',
-            help='Get package')
-    parser.add_argument('--push',
-            action='store_true',
-            help='Push to package repository (scp format)')
+parser = argparse.ArgumentParser('Commnad line tool for compiling and building packages')
+parser.add_argument('--config',
+        default='build.yml',
+        help='Select a diferent config file')
+parser.add_argument('--packager',
+        default='packager',
+        help='Select a diferent custom packager module')
+parser.add_argument('--pythonpath',
+        default='',
+        help='Add to python path')
+parser.add_argument('--gen-config',
+        action='store_true',
+        help='Create example config file')
 
-    parser.add_argument('--no-clean-pkg-paths',
-            action='store_true',
-            help="Don't clear package paths")
-    parser.add_argument('--no-check-build-deps',
-            action='store_true',
-            help="Don't check/install build dependencies")
-    parser.add_argument('--no-clean-checkout',
-            action='store_true',
-            help="Only update if project is already checked out")
+parser.add_argument('--get',
+        action='store_true',
+        help='Get package')
+parser.add_argument('--push',
+        action='store_true',
+        help='Push to package repository (scp format)')
 
-    parser.add_argument('--pkg-repo',
-            default=None,
-            help='Set/Override package repo path')
-    parser.add_argument('--src',
-            default=None,
-            help='Use a path for src code')
-    parser.add_argument('--target',
-            default=None,
-            help='Hostname of the build target')
-    args = vars(parser.parse_args())
+parser.add_argument('--no-clean-pkg-paths',
+        action='store_true',
+        help="Don't clear package paths")
+parser.add_argument('--no-check-build-deps',
+        action='store_true',
+        help="Don't check/install build dependencies")
+parser.add_argument('--no-clean-checkout',
+        action='store_true',
+        help="Only update if project is already checked out")
+
+parser.add_argument('--pkg-repo',
+        default=None,
+        help='Set/Override package repo path')
+parser.add_argument('--src',
+        default=None,
+        help='Use a path for src code')
+parser.add_argument('--target',
+        default=None,
+        help='Hostname of the build target')
+
+def main(args=None):
+    exitstatus = EXIT_OK
+    if args is None:
+        args = vars(parser.parse_args())
 
     if args.get('gen_config'):
         print example_config
-        sys.exit(0)
+        return exitstatus
 
     pythonpath = args.pop('pythonpath')
     if pythonpath:
@@ -205,7 +217,6 @@ def main():
         env.use_ssh_config = True
         env.hosts = [target, ]
 
-
     execute(build, config)
 
 
@@ -226,9 +237,9 @@ def build(config):
     profile = config.get('profile')
     if profile:
         if profile == 'python':
-            packager = importlib.import_module('packager').PythonPackager(config)
+            packager = importlib.import_module('empackage.packager').PythonPackager(config)
         elif profile == 'make':
-            packager = importlib.import_module('packager').MakePackager(config)
+            packager = importlib.import_module('empackage.packager').MakePackager(config)
     else:
         packager_module = config.pop('packager')
         packager = importlib.import_module(packager_module).Packager(config)
@@ -248,7 +259,10 @@ def build(config):
         local('scp {} {}'.format(os.path.join('/tmp', packager.pkg_name), pkg_repo))
         local('rm /tmp/{}'.format(packager.pkg_name))
 
+    return exitstatus
+
 
 if __name__ == '__main__':
-    main()
+    errno = main()
+    sys.exit(errno)
 

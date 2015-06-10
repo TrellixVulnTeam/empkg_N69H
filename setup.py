@@ -4,19 +4,18 @@ from setuptools import setup, find_packages
 
 setup(
     name="empackage",
-    version="0.2",
+    version="0.3",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'Fabric>=1.9.1',
-        'fabtools>=0.19.0',
-        'PyYAML>=3.11',
-        'click==3.2',
-        'jinja2>=2.7.3',
+        'Fabric',
+        'fabtools',
+        'PyYAML',
+        'jinja2',
     ],
     entry_points={
         'console_scripts': [
-            'empackage = empackage.empackage:main',
+            'empackage = empackage.__main__:main',
         ]
     },
 
