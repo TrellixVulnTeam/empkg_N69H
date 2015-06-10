@@ -204,7 +204,8 @@ def main(args=None):
     # TODO check required config options (target, etc)
     if 'target' not in config or not config['target']:
         print 'Build target must be defined'
-        sys.exit(1)
+        exitstatus = EXIT_FAL
+        return exitstatus
 
     target = config.pop('target')
 
