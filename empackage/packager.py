@@ -64,12 +64,12 @@ class BasePackager(object):
 
     def prepare(self):
         """Prepare system, install packages and fpm"""
-        print 'Preparing...'
+        print('Preparing...')
 
         # Clean paths where our package will be installed
         if not self.conf.get('no_clean_pkg_paths'):
             if '/' in self.conf['pkg_paths']:
-                print '/ in pkg_paths, you do not want to do that'
+                print('/ in pkg_paths, you do not want to do that')
                 sys.exit(1)
             sudo('rm -rf {}'.format(' '.join(self.conf['pkg_paths'])))
             sudo('mkdir -p {}'.format(' '.join(self.conf['pkg_paths'])))
@@ -129,13 +129,13 @@ class BasePackager(object):
         # TODO check if there is a repo on destination dir and change behaviour
         # to remove no_clean_checkout
         if self.conf.get('no_clean_checkout'):
-            print 'Updating project...'
+            print('Updating project...')
             if self.conf['repo_type'] == 'git':
                 _git_update(self.conf['src_path'])
             elif self.conf['repo_type'] in ('hg', 'mercurial'):
                 _hg_update(self.conf['src_path'], self.conf.get('commit', ''))
         else:
-            print 'Checking out project...'
+            print('Checking out project...')
             if self.conf['repo_type'] == 'git':
                 _git_clone(self.conf['repo'],
                         self.conf['src_path'],
@@ -160,7 +160,7 @@ class BasePackager(object):
 
     def makepkg(self):
         """Build package"""
-        print 'Building package...'
+        print('Building package...')
 
         with cd(self.conf['tmp_remote_dir']):
             self.copy_hooks()
@@ -301,11 +301,17 @@ class PythonPackager(BasePackager):
         with cd(self.conf['prefix']):
             if self.conf.get('python_virtualenv', True):
                 run('virtualenv .')
-                run('./bin/pip install {}'
+                if self.conf.get('python_requires'):
+                    run('./bin/pip install {} -q'
                         .format(' '.join(self.conf.get('python_requires'))))
+                if self.conf.get('pip_requires'):
+                    run('./bin/pip install -r requirements.txt -q')
             else:
-                sudo('./bin/pip install {}'
+                if self.conf.get('python_requires'):
+                    sudo('./bin/pip install {} -q'
                         .format(' '.join(self.conf.get('python_requires'))))
+                if self.conf.get('pip_requires'):
+                    sudo('./bin/pip install -r requirements.txt --upgrade -q')
 
 
 def _current_git_branch(src_path):

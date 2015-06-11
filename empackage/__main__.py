@@ -1,4 +1,6 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2
+from __future__ import (division, absolute_import, print_function,
+    unicode_literals)
 
 """Commnad line tool to build a package"""
 import argparse
@@ -85,8 +87,14 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 ###################################
 # Make cmd prefix, also used for relative paths
 #prefix:
-# Build dependencies
+# Build dependencies, optional
 #build_deps:
+# Pip build dependencies, optional
+# pip_build_deps:
+# Pip Requires, if true expects templates/requirements.txt and will pip install it
+# after creating the virtualenv (use it to pin versions to good knowns)
+# or use python_requires if you don't want a requirements.txt
+# pip_requires:
 # Package runtime dependencies
 #run_deps:
 # Where to place project source
@@ -159,7 +167,7 @@ def main(args=None):
         args = vars(parser.parse_args())
 
     if args.get('gen_config'):
-        print example_config
+        print(example_config)
         return exitstatus
 
     pythonpath = args.pop('pythonpath')
@@ -203,8 +211,8 @@ def main(args=None):
 
     # TODO check required config options (target, etc)
     if 'target' not in config or not config['target']:
-        print 'Build target must be defined'
-        exitstatus = EXIT_FAL
+        print('Build target must be defined')
+        exitstatus = EXIT_FAIL
         return exitstatus
 
     target = config.pop('target')
@@ -219,6 +227,7 @@ def main(args=None):
         env.hosts = [target, ]
 
     execute(build, config)
+    return exitstatus
 
 
 def build(config):
@@ -226,12 +235,15 @@ def build(config):
     # Build requirements
     no_check_build_deps = config.pop('no_check_build_deps')
     if not no_check_build_deps and config.get('build_deps'):
-        print 'Installing build packages...'
+        print('Installing build packages...')
         build_deps = config.get('build_deps')
         sudo('apt-get update -qq')
         if build_deps:
             sudo('apt-get install -qq {}'.format(' '.join(build_deps)))
         sudo('gem install fpm')
+        if config.get('pip_build_deps'):
+            for package in config.get('pip_build_deps'):
+                sudo('pip install %s' % package)
 
     get_pkg = config.pop('get')
     push_pkg = config.pop('push')
@@ -260,7 +272,6 @@ def build(config):
         local('scp {} {}'.format(os.path.join('/tmp', packager.pkg_name), pkg_repo))
         local('rm /tmp/{}'.format(packager.pkg_name))
 
-    return exitstatus
 
 
 if __name__ == '__main__':
