@@ -236,14 +236,20 @@ def build(config):
     no_check_build_deps = config.pop('no_check_build_deps')
     if not no_check_build_deps and config.get('build_deps'):
         print('Installing build packages...')
-        build_deps = config.get('build_deps')
-        sudo('apt-get update -qq')
-        if build_deps:
-            sudo('apt-get install -qq {}'.format(' '.join(build_deps)))
+
+        build_deps = ' '.join(config.get('build_deps'))
+        if config['pkg_type'] == 'deb':
+            sudo('apt-get update -qq')
+            if build_deps:
+                sudo('apt-get install -qq %s' % build_deps)
+        if config['pkg_type'] == 'rpm':
+            sudo('yum update -q %s' % build_deps)
+
         sudo('gem install fpm')
         if config.get('pip_build_deps'):
-            for package in config.get('pip_build_deps'):
-                sudo('pip install %s' % package)
+            pip_build_deps = ' '.join(config.get('pip_build_deps'))
+            if pip_build_deps:
+                sudo('pip install %s' % pip_build_deps)
 
     get_pkg = config.pop('get')
     push_pkg = config.pop('push')
