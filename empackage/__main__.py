@@ -229,56 +229,14 @@ def main(args=None):
     execute(build, config)
     return exitstatus
 
-# TODO should we allow cross packaging?
-minimum_packages = {
-    'rpm': [
-        'gcc',
-        'gcc-c++',
-        'kernel-devel',
-        'openssl',
-        'openssl-devel',
-        'ruby',
-        'ruby-devel',
-        'rubygems',
-        'rpm',
-        'rpm-build',
-    ],
-    'deb': [
-        'build-essentials',
-        'openssl',
-        'openssl-dev',
-        'ruby',
-        'ruby-dev',
-    ],
-}
 
 def build(config):
     """Initiate fabric task to build package"""
-    # Build requirements
-    no_check_build_deps = config.pop('no_check_build_deps')
-    if not no_check_build_deps and config.get('build_deps'):
-        print('Installing build packages...')
-
-
-        build_deps = ' '.join((
-                ' '.join(minimum_packages.get(config['pkg_type'])),
-                ' '.join(config.get('build_deps')),
-                ))
-        if config['pkg_type'] == 'deb':
-            sudo('apt-get update -qq')
-            sudo('apt-get install -qq %s' % build_deps)
-        elif config['pkg_type'] == 'rpm':
-            sudo('yum install -y -q %s' % build_deps)
-
-        sudo('gem install fpm')
-        if config.get('pip_build_deps'):
-            pip_build_deps = ' '.join(config.get('pip_build_deps'))
-            if pip_build_deps:
-                sudo('pip install %s' % pip_build_deps)
-
     get_pkg = config.pop('get')
     push_pkg = config.pop('push')
     profile = config.get('profile')
+    no_check_build_deps = config.pop('no_check_build_deps')
+
     if profile:
         if profile == 'python':
             packager = importlib.import_module('empackage.packager').PythonPackager(config)
@@ -288,6 +246,8 @@ def build(config):
         packager_module = config.pop('packager')
         packager = importlib.import_module(packager_module).Packager(config)
 
+    if not no_check_build_deps:
+        packager.install_build_dependencies()
     packager.prepare()
     packager.build()
     packager.makepkg()

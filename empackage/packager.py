@@ -34,6 +34,40 @@ class BasePackager(object):
     """
 
     template_dir = './templates'
+    minimum_dependencies = {
+        'rpm': [
+            'gcc',
+            'gcc-c++',
+            'kernel-devel',
+            'openssl',
+            'openssl-devel',
+            'ruby',
+            'ruby-devel',
+            'rubygems',
+            'rpm',
+            'rpm-build',
+        ],
+        'deb': [
+            'build-essential',
+            'openssl',
+            'libssl-dev',
+            'ruby',
+            'ruby-dev',
+        ],
+    }
+
+    repo_type_dependencies = {
+        'git': {
+            'deb': ['git'],
+            'rpm': ['git-all'],
+            },
+        'hg': {
+            'deb': ['mercurial'],
+            'rpm': ['mercurial'],
+            },
+        }
+
+    extra_dependencies = {}
 
     def __init__(self, conf):
         conf['arch'] = conf.get('arch', 'all')
@@ -62,8 +96,37 @@ class BasePackager(object):
 
         self.conf = conf
 
+    def install_build_dependencies(self):
+        """Install build dependencies"""
+        print('Installing build dependencies...')
+        if self.conf['pkg_type'] == 'deb':
+            sudo('apt-get update -qq')
+            sudo('apt-get install -qq %s' % ' '.join(self.build_dependencies))
+        elif self.conf['pkg_type'] == 'rpm':
+            sudo('yum install -y -q %s' % ' '.join(self.build_dependencies))
+        # Install fpm
+        sudo('gem install fpm')
+        # TODO maybe move to python profile?
+        if self.conf.get('pip_build_deps'):
+            pip_build_deps = ' '.join(self.conf.get('pip_build_deps'))
+            if pip_build_deps:
+                sudo('pip install %s' % pip_build_deps)
+
+    @property
+    def build_dependencies(self):
+        deps = []
+        deps.extend(self.minimum_dependencies.get(self.conf['pkg_type']))
+        deps.extend(
+            self.repo_type_dependencies
+                .get(self.conf['repo_type'])
+                .get(self.conf['pkg_type'])
+            )
+        deps.extend(self.extra_dependencies.get(self.conf['pkg_type']))
+        return deps
+
+
     def prepare(self):
-        """Prepare system, install packages and fpm"""
+        """Prepare system, create file structure copy templates..."""
         print('Preparing...')
 
         # Clean paths where our package will be installed
@@ -259,7 +322,6 @@ class BasePackager(object):
                 if self.conf.get('run_deps') else '')
         return arg
 
-
     def get_hooks_arg(self):
         hooks_str = ''
         if not isdir(self.conf['hooks_dir']):
@@ -297,6 +359,11 @@ class BasePackager(object):
 
 
 class PythonPackager(BasePackager):
+    extra_dependencies = {
+        'deb': ['python-virtualenv'],
+        'rpm': ['python-virtualenv'],
+        }
+
     def build(self):
         with cd(self.conf['prefix']):
             if self.conf.get('python_virtualenv', True):
