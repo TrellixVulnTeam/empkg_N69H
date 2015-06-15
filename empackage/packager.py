@@ -20,6 +20,7 @@ from fabric.api import (
     get,
     hide,
 )
+from fabric.contrib.project import upload_project
 from fabric.contrib.files import upload_template
 from fabtools.files import is_dir, is_file
 
@@ -121,7 +122,9 @@ class BasePackager(object):
                 .get(self.conf['repo_type'])
                 .get(self.conf['pkg_type'])
             )
-        deps.extend(self.extra_dependencies.get(self.conf['pkg_type']))
+        extra_deps = self.extra_dependencies.get(self.conf['pkg_type'])
+        if extra_deps:
+            deps.extend(extra_deps)
         return deps
 
 
@@ -151,7 +154,7 @@ class BasePackager(object):
 
         # Place source code
         if self.conf.get('src'):
-            put('{}/*'.format(self.conf['src']), self.conf['src_path'])
+            upload_project(self.conf['src'], self.conf['src_path'])
         elif self.conf.get('repo'):
             self.checkout_project()
 
