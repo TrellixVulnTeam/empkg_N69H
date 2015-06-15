@@ -20,7 +20,7 @@ from fabric.api import (
     get,
     hide,
 )
-from fabric.contrib.project import upload_project
+from fabric.contrib.project import rsync_project
 from fabric.contrib.files import upload_template
 from fabtools.files import is_dir, is_file
 
@@ -154,7 +154,7 @@ class BasePackager(object):
 
         # Place source code
         if self.conf.get('src'):
-            upload_project(self.conf['src'], self.conf['src_path'])
+            rsync_project(local_dir=self.conf['src'] + '/', remote_dir=self.conf['src_path'] + '/')
         elif self.conf.get('repo'):
             self.checkout_project()
 
