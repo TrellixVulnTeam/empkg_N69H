@@ -43,7 +43,8 @@ description: What does it do
 # Build target
 ###################################
 # Hostname/ip of the target machine to perform the build
-# Note: this can be overriden with the --target cli argument
+# Note: this can be defined in the ~/.empackage file and overriden with the
+# --target cli argument.
 #target: 
 
 # Repository/Src location
@@ -66,7 +67,8 @@ description: What does it do
 ###################################
 # Repository to upload package to, optional
 # Note: Package will only be pushed to the repo using the --push cli argument.
-#       This parameter can be overriden with the --pkg-repo cli argument.
+#       This parameter can be defined in the ~/.empackage file and overriden
+#       with the --pkg-repo cli argument
 pkg_repo: repo.example.com:/repo/development/wheezy
 
 # Package config
