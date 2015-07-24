@@ -125,6 +125,8 @@ class BasePackager(object):
         extra_deps = self.extra_dependencies.get(self.conf['pkg_type'])
         if extra_deps:
             deps.extend(extra_deps)
+        if self.conf.get('build_deps'):
+            deps.extend(self.conf.get('build_deps'))
         return deps
 
 
