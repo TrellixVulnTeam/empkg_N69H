@@ -79,7 +79,7 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 # Paths (dir or file) to include in the package, defaults to prefix
 #pkg_paths: <prefix>
 # Paths to directory containing install hook scripts
-#hooks_dir: debian
+#hooks_dir: hooks
 # Paths to config files, relative paths start from prefix
 #config_files:
 # Extra directories to create
