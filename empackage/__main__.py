@@ -87,33 +87,42 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 
 # Build config
 ###################################
+# Use predifined build profile (ex: python, make), optional
+#profile:
 # Make cmd prefix, also used for relative paths
 #prefix:
 # Build dependencies, optional
 #build_deps:
-# Pip build dependencies, optional
-# pip_build_deps:
-# Pip Requires, if true expects templates/requirements.txt and will pip install it
-# after creating the virtualenv (use it to pin versions to good knowns)
-# or use python_requires if you don't want a requirements.txt
-# pip_requires:
 # Package runtime dependencies
 #run_deps:
 # Where to place project source
 #src_path: /tmp/<pkg_name>
 # Place project directly on <prefix>
 #inplace: False
-# Use predifined build profile (ex: python, make), optional
-#profile:
-# Python requires, `python` profile, optional
-#python_requires:
-# Python virtualenv, `python` profile
-#python_virtualenv: True
-#python_requires:
 # Make options, `make` profile, optional
 #make_opts:
 # Make target, `make` profile, optional
 # make_target: install
+
+# Python Profile
+###################################
+# Python requires, `python` profile, optional
+#python_requires:
+# Python virtualenv, `python` profile
+#python_virtualenv: True
+# Pip build dependencies, optional
+# pip_build_deps:
+# Pip Requires, if true expects templates/requirements.txt and will pip install it
+# after creating the virtualenv (use it to pin versions to good knowns)
+# or use python_requires if you don't want a requirements.txt
+# pip_requires:
+
+# Django Profile
+###################################
+# Add to python path when running django cmds
+#pythonpath:
+# Module containing django settings
+#settings:
 
 # Extra vars
 ###################################
@@ -242,6 +251,8 @@ def build(config):
     if profile:
         if profile == 'python':
             packager = importlib.import_module('empackage.packager').PythonPackager(config)
+        elif profile == 'django':
+            packager = importlib.import_module('empackage.packager').DjangoPackager(config)
         elif profile == 'make':
             packager = importlib.import_module('empackage.packager').MakePackager(config)
     else:

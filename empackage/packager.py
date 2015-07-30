@@ -107,7 +107,6 @@ class BasePackager(object):
             sudo('yum install -y -q %s' % ' '.join(self.build_dependencies))
         # Install fpm
         sudo('gem install fpm')
-        # TODO maybe move to python profile?
         if self.conf.get('pip_build_deps'):
             pip_build_deps = ' '.join(self.conf.get('pip_build_deps'))
             if pip_build_deps:
@@ -369,9 +368,17 @@ class PythonPackager(BasePackager):
         'rpm': ['python-virtualenv'],
         }
 
+    def install_build_dependencies(self):
+        """Install build dependencies"""
+        super(PythonPackager, self).install_build_dependencies()
+        if self.conf.get('pip_build_deps'):
+            pip_build_deps = ' '.join(self.conf.get('pip_build_deps'))
+            if pip_build_deps:
+                sudo('pip install %s' % pip_build_deps)
+
     def build(self):
         with cd(self.conf['prefix']):
-            if self.conf.get('python_virtualenv', True):
+            if self.conf.get('virtualenv', True):
                 run('virtualenv .')
                 if self.conf.get('python_requires'):
                     run('./bin/pip install {} -q'
@@ -380,10 +387,19 @@ class PythonPackager(BasePackager):
                     run('./bin/pip install -r requirements.txt -q')
             else:
                 if self.conf.get('python_requires'):
-                    sudo('./bin/pip install {} -q'
+                    sudo('pip install {} -q'
                         .format(' '.join(self.conf.get('python_requires'))))
                 if self.conf.get('pip_requires'):
-                    sudo('./bin/pip install -r requirements.txt --upgrade -q')
+                    sudo('pip install -r requirements.txt --upgrade -q')
+
+
+class DjangoPackager(PythonPackager):
+    def build(self):
+        super(DjangoPackager, self).build()
+        with cd(self.conf['prefix']):
+            run('./bin/django-admin collectstatic --pythonpath={} --settings={}'
+                ' --noinput'
+                .format(self.conf['pythonpath'], self.conf['settings']))
 
 
 def _current_git_branch(src_path):
