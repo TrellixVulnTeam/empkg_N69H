@@ -368,6 +368,11 @@ class PythonPackager(BasePackager):
         'rpm': ['python-virtualenv'],
         }
 
+    def __init__(self, conf):
+        super(PythonPackager, self).__init__(conf)
+        if conf.get('version').startswith('module-'):
+            self.set_version(conf['version'][len('module-'):])
+
     def install_build_dependencies(self):
         """Install build dependencies"""
         super(PythonPackager, self).install_build_dependencies()
@@ -378,31 +383,32 @@ class PythonPackager(BasePackager):
 
     def build(self):
         with cd(self.conf['prefix']):
+            pip_cmd = 'pip'
             if self.conf.get('virtualenv', True):
                 run('virtualenv .')
-                if self.conf.get('python_requires'):
-                    run('./bin/pip install {} -q'
-                        .format(' '.join(self.conf.get('python_requires'))))
-                if self.conf.get('pip_requires'):
-                    self.copy_requirements()
-                    run('./bin/pip install -r requirements.txt -q')
-            else:
-                if self.conf.get('python_requires'):
-                    sudo('pip install {} -q'
-                         .format(' '.join(self.conf.get('python_requires'))))
-                if self.conf.get('pip_requires'):
-                    self.copy_requirements()
-                    sudo('pip install -r requirements.txt --upgrade -q')
+                pip_cmd = './bin/pip'
+
+            if self.conf.get('python_requires'):
+                run('{} install {} -q'
+                    .format(pip_cmd, ' '.join(self.conf.get('python_requires'))))
+            if self.conf.get('pip_requires'):
+                self.copy_requirements()
+                run('{} install -r requirements.txt -q --upgrade'.format(pip_cmd))
 
     def copy_requirements(self):
-        if 'pip_requirements' in self.conf and isfile(self.conf.get('requirements')):
-            fpath = abspath(self.conf['requirements'])
+        """Copy requirements file"""
+        if 'pip_requires' in self.conf and isfile(self.conf.get('pip_requires')):
+            fpath = abspath(self.conf['pip_requires'])
             upload_template(
                 filename=basename(fpath),
                 destination=join(self.conf['prefix'], 'requirements.txt'),
                 template_dir=dirname(fpath),
                 context=self.get_context(),
                 use_jinja=True)
+
+    def set_version(self, module):
+        """Get version from module"""
+        self.conf['version'] = __import__(module).__version__
 
 
 class DjangoPackager(PythonPackager):
