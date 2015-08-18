@@ -384,13 +384,25 @@ class PythonPackager(BasePackager):
                     run('./bin/pip install {} -q'
                         .format(' '.join(self.conf.get('python_requires'))))
                 if self.conf.get('pip_requires'):
+                    self.copy_requirements()
                     run('./bin/pip install -r requirements.txt -q')
             else:
                 if self.conf.get('python_requires'):
                     sudo('pip install {} -q'
-                        .format(' '.join(self.conf.get('python_requires'))))
+                         .format(' '.join(self.conf.get('python_requires'))))
                 if self.conf.get('pip_requires'):
+                    self.copy_requirements()
                     sudo('pip install -r requirements.txt --upgrade -q')
+
+    def copy_requirements(self):
+        if 'pip_requirements' in self.conf and isfile(self.conf.get('requirements')):
+            fpath = abspath(self.conf['requirements'])
+            upload_template(
+                filename=basename(fpath),
+                destination=join(self.conf['prefix'], 'requirements.txt'),
+                template_dir=dirname(fpath),
+                context=self.get_context(),
+                use_jinja=True)
 
 
 class DjangoPackager(PythonPackager):
