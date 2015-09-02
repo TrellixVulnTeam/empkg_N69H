@@ -112,7 +112,7 @@ pkg_repo: repo.example.com:/repo/development/wheezy
 #python_virtualenv: True
 # Pip build dependencies, optional
 # pip_build_deps:
-# Pip Requires, if true expects templates/requirements.txt and will pip install it
+# Pip Requires, expects a requirements  file and will pip install it
 # after creating the virtualenv (use it to pin versions to good knowns)
 # or use python_requires if you don't want a requirements.txt
 # pip_requires:
