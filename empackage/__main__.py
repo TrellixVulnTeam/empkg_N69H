@@ -125,9 +125,9 @@ pkg_repo_mode: sftp (other modes: scp)
 # Django packager
 ###################################
 # Add to python path when running django cmds
-#pythonpath:
+#django_pythonpath:
 # Module containing django settings
-#settings:
+#django_settings:
 
 # Extra vars
 ###################################

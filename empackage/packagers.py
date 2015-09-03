@@ -417,7 +417,7 @@ class DjangoPackager(PythonPackager):
         with cd(self.conf['prefix']):
             run('./bin/django-admin collectstatic --pythonpath={} --settings={}'
                 ' --noinput'
-                .format(self.conf['pythonpath'], self.conf['settings']))
+                .format(self.conf['django_pythonpath'], self.conf['django_settings']))
 
 
 def _current_git_branch(src_path):
