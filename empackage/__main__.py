@@ -7,6 +7,7 @@ import argparse
 import importlib
 import os
 import sys
+from os.path import join
 
 import yaml
 from fabric.api import env, execute
@@ -14,7 +15,7 @@ from fabric.api import sudo, get, put, cd, local
 from fabtools.vagrant import ssh_config, _settings_dict
 
 EXIT_OK = 0
-EXIT_FAILED = 1
+EXIT_FAIL = 1
 
 def vagrant(name=''):
     """Setup fabric to use vagrant"""
@@ -70,6 +71,7 @@ description: What does it do
 #       This parameter can be defined in the ~/.empackage file and overriden
 #       with the --pkg-repo cli argument
 pkg_repo: repo.example.com:/repo/development/wheezy
+pkg_repo_mode: sftp (other modes: scp)
 
 # Package config
 ###################################
@@ -161,16 +163,16 @@ parser.add_argument('--no-check-build-deps',
 parser.add_argument('--no-clean-checkout',
         action='store_true',
         help="Only update if project is already checked out")
-
-parser.add_argument('--pkg-repo',
-        default=None,
-        help='Set/Override package repo path')
 parser.add_argument('--src',
         default=None,
         help='Use a path for src code')
+
 parser.add_argument('--target',
         default=None,
         help='Hostname of the build target')
+parser.add_argument('--pkg-repo',
+        default=None,
+        help='Set/Override package repo')
 
 def main(args=None):
     exitstatus = EXIT_OK
@@ -226,28 +228,21 @@ def main(args=None):
         exitstatus = EXIT_FAIL
         return exitstatus
 
-    target = config.pop('target')
+    packager = get_packager(config)
 
+    build(packager)
 
-    # Configure build target
-    # TODO enable localhost
-    if target == 'vagrant':
-        vagrant()
-    else:
-        env.use_ssh_config = True
-        env.hosts = [target, ]
+    if packager.conf['get']:
+        get_package(packager)
 
-    execute(build, config)
+    if packager.conf['push']:
+        push_package(packager)
+
     return exitstatus
 
 
-def build(config):
-    """Initiate fabric task to build package"""
-    get_pkg = config.pop('get')
-    push_pkg = config.pop('push')
+def get_packager(config):
     profile = config.get('profile')
-    no_check_build_deps = config.pop('no_check_build_deps')
-
     if profile:
         if profile == 'python':
             packager = importlib.import_module('empackage.packager').PythonPackager(config)
@@ -258,6 +253,21 @@ def build(config):
     else:
         packager_module = config.pop('packager')
         packager = importlib.import_module(packager_module).Packager(config)
+    return packager
+
+
+def configure_target(target):
+    # TODO enable local build
+    if target == 'vagrant':
+        vagrant()
+    else:
+        env.use_ssh_config = True
+        env.hosts = [target, ]
+
+
+def _build(packager):
+    """Initiate fabric task to build package"""
+    no_check_build_deps = packager.conf.get('no_check_build_deps')
 
     if not no_check_build_deps:
         packager.install_build_dependencies()
@@ -265,17 +275,41 @@ def build(config):
     packager.build()
     packager.makepkg()
 
-    if get_pkg:
-        with cd(packager.conf['tmp_remote_dir']):
-            get(packager.pkg_name, '%(basename)s')
-    if push_pkg:
-        # TODO improve
-        with cd(packager.conf['tmp_remote_dir']):
-            get(packager.pkg_name, '/tmp')
-        pkg_repo = config.pop('pkg_repo')
-        local('scp {} {}'.format(os.path.join('/tmp', packager.pkg_name), pkg_repo))
-        local('rm /tmp/{}'.format(packager.pkg_name))
 
+def build(packager):
+    configure_target(packager.conf['target'])
+    execute(_build, packager)
+
+
+def _get_package(packager, local_path=None):
+    #if local_path is None:
+    with cd(packager.conf['tmp_remote_dir']):
+        #get(packager.pkg_name, '%(basename)s')
+        get(remote_path=packager.pkg_name,
+            local_path=local_path)
+
+
+def get_package(packager, remote_path=None):
+    configure_target(packager.conf['target'])
+    execute(_get_package, packager, remote_path)
+
+
+def push_package(packager):
+    get_package(packager, '/tmp/')
+    configure_target(packager.conf['pkg_repo'].split(':')[0])
+    execute(_push_package, packager)
+    local('rm /tmp/{}'.format(packager.pkg_name))
+
+
+def _push_package(packager):
+    pkg_repo = packager.conf['pkg_repo']
+    pkg_repo_mode = packager.conf.get('pkg_repo_mode', 'sftp')
+    if pkg_repo_mode == 'scp':
+        local('scp {} {}'.format(join('/tmp', packager.pkg_name), pkg_repo))
+    elif pkg_repo_mode == 'sftp':
+        _, pkg_repo_path = pkg_repo.split(':')
+        put(local_path=join('/tmp', packager.pkg_name),
+            remote_path=pkg_repo_path)
 
 
 if __name__ == '__main__':
