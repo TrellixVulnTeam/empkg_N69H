@@ -255,8 +255,7 @@ def get_packager(config):
     packager = config.get('packager')
     if packager is None:
         packager = 'packager.Packager'
-    packager_module, packager_name = \
-        config.get('packager').rsplit('.', 1)
+    packager_module, packager_name = packager.rsplit('.', 1)
     _temp = __import__(packager_module, fromlist=[packager_name])
     packager = getattr(_temp, packager_name)(config)
     return packager
