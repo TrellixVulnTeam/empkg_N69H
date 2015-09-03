@@ -89,8 +89,11 @@ pkg_repo_mode: sftp (other modes: scp)
 
 # Build config
 ###################################
-# Use predifined build profile (ex: python, make), optional
-#profile:
+# Packager to use, optional (looks for packager.Packager by default)
+# Available packagers:
+# empackage.packagers.PythonPackager
+# empackage.packagers.DjangoPackager
+#packager: packagers.Packager
 # Make cmd prefix, also used for relative paths
 #prefix:
 # Build dependencies, optional
@@ -101,16 +104,16 @@ pkg_repo_mode: sftp (other modes: scp)
 #src_path: /tmp/<pkg_name>
 # Place project directly on <prefix>
 #inplace: False
-# Make options, `make` profile, optional
+# Make options, `make` packager, optional
 #make_opts:
-# Make target, `make` profile, optional
+# Make target, `make` packager, optional
 # make_target: install
 
-# Python Profile
+# Python Packager
 ###################################
-# Python requires, `python` profile, optional
+# Python requires, `python` packager, optional
 #python_requires:
-# Python virtualenv, `python` profile
+# Python virtualenv, `python` packager
 #python_virtualenv: True
 # Pip build dependencies, optional
 # pip_build_deps:
@@ -119,7 +122,7 @@ pkg_repo_mode: sftp (other modes: scp)
 # or use python_requires if you don't want a requirements.txt
 # pip_requires:
 
-# Django Profile
+# Django packager
 ###################################
 # Add to python path when running django cmds
 #pythonpath:
@@ -134,11 +137,12 @@ pkg_repo_mode: sftp (other modes: scp)
 """
 
 parser = argparse.ArgumentParser('Commnad line tool for compiling and building packages')
-parser.add_argument('--config',
+parser.add_argument('config',
+        nargs='?',
         default='build.yml',
         help='Select a diferent config file')
 parser.add_argument('--packager',
-        default='packager',
+        default=None,
         help='Select a diferent custom packager module')
 parser.add_argument('--pythonpath',
         default='',
@@ -183,7 +187,7 @@ def main(args=None):
         print(example_config)
         return exitstatus
 
-    pythonpath = args.pop('pythonpath')
+    pythonpath = args.get('pythonpath')
     if pythonpath:
         sys.path = pythonpath.split(',') + sys.path
     if '' not in sys.path:
@@ -201,7 +205,7 @@ def main(args=None):
         fd.close()
 
     # Config file options
-    config_file = args.pop('config')
+    config_file = args.get('config')
     if config_file:
         try:
             fd = open(config_file)
@@ -228,7 +232,13 @@ def main(args=None):
         exitstatus = EXIT_FAIL
         return exitstatus
 
-    packager = get_packager(config)
+    try:
+        packager = get_packager(config)
+    except ImportError:
+        print('Packager not found')
+        exitstatus = EXIT_FAIL
+        return exitstatus
+
 
     build(packager)
 
@@ -242,17 +252,13 @@ def main(args=None):
 
 
 def get_packager(config):
-    profile = config.get('profile')
-    if profile:
-        if profile == 'python':
-            packager = importlib.import_module('empackage.packager').PythonPackager(config)
-        elif profile == 'django':
-            packager = importlib.import_module('empackage.packager').DjangoPackager(config)
-        elif profile == 'make':
-            packager = importlib.import_module('empackage.packager').MakePackager(config)
-    else:
-        packager_module = config.pop('packager')
-        packager = importlib.import_module(packager_module).Packager(config)
+    packager = config.get('packager')
+    if packager is None:
+        packager = 'packager.Packager'
+    packager_module, packager_name = \
+        config.get('packager').rsplit('.', 1)
+    _temp = __import__(packager_module, fromlist=[packager_name])
+    packager = getattr(_temp, packager_name)(config)
     return packager
 
 
