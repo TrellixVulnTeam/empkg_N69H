@@ -287,16 +287,16 @@ def build(packager):
 
 
 def _get_package(packager, local_path=None):
-    #if local_path is None:
+    if local_path is None:
+        local_path = '%(basename)s'
     with cd(packager.conf['tmp_remote_dir']):
-        #get(packager.pkg_name, '%(basename)s')
         get(remote_path=packager.pkg_name,
             local_path=local_path)
 
 
-def get_package(packager, remote_path=None):
+def get_package(packager, local_path=None):
     configure_target(packager.conf['target'])
-    execute(_get_package, packager, remote_path)
+    execute(_get_package, packager, local_path)
 
 
 def push_package(packager):
