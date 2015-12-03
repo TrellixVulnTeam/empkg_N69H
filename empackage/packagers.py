@@ -370,8 +370,8 @@ class PythonPackager(BasePackager):
 
     def __init__(self, conf):
         super(PythonPackager, self).__init__(conf)
-        if conf.get('version').startswith('module-'):
-            self.set_version(conf['version'][len('module-'):])
+        #if conf.get('version').startswith('module-'):
+        #    self.set_version(conf['version'][len('module-'):])
 
     def install_build_dependencies(self):
         """Install build dependencies"""
