@@ -1,0 +1,6 @@
+__version__ = '1.0.0'
+__license__ = 'BSD'
+__description__ = 'PKGBUILD style configuration for fpm'
+__url__ = 'https://gitlab.intra.sapo.pt/security/empkg'
+__author__ = 'Hugo Castilho'
+__author_email__ = 'hcastilho@gmail.com'
