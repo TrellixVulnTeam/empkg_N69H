@@ -185,6 +185,7 @@ class BasePackager(object):
         context = {}
         context.update(self.conf)
         context.update({
+            'arch': self.arch,
             'backup': self.backup,
             'changelog': self.changelog,
             'depends': self.depends,
@@ -216,6 +217,13 @@ class BasePackager(object):
                '{paths}'
                .format(**context))
         return cmd
+
+    @property
+    def arch(self):
+        if self.conf['arch'] == 'any' and self.conf['pkgtype'] == 'deb':
+            return 'all'
+        else:
+            return self.arch
 
     @property
     def backup(self):
