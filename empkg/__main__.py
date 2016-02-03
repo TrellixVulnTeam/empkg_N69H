@@ -108,8 +108,20 @@ def remote_install(args):
             'python-dev',  # PyYAML
         )
     elif distro == 'centos':
-        depends = ('gcc', 'gcc-c++', 'kernel-devel', 'openssl', 'openssl-devel', 'ruby', 'ruby-devel', 'rubygems',
-                   'rpm', 'rpm-build', )  # TODO centos pip?
+        depends = (
+            'gcc',
+            'gcc-c++',
+            'kernel-devel',
+            'openssl',
+            'openssl-devel',
+            'ruby',
+            'ruby-devel',
+            'rubygems',
+            'rpm',
+            'rpm-build',
+            'python-devel',
+            'python-pip',
+        )
     pkgman = get_pkgman_class(get_pkgman(distro))
     sudo(pkgman.install_cmd % ' '.join(depends))
 
