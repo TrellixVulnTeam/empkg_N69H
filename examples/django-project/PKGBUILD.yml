@@ -1,0 +1,97 @@
+# Maintainer: Hugo Castilho <hugo.p.castilho@telecom.pt>
+pkgname: django_project
+pkgver: 0.0.1
+pkgrel: 1
+arch: any
+# epoch:
+pkgdesc: django_project TODO
+url: https://github.com/hcastilho/TODO
+license: [BSD]
+
+srcdir: /servers/django_project
+_prefix: /servers/django_project
+_user: django_project
+_pypi_host: devpi.local.example.com
+
+
+source:
+- settings.py
+- etc/django/settings.py
+- etc/nginx/sites-available/django_project.conf
+- etc/uwsgi/apps_available/django_project.ini
+
+template:
+- etc/django/settings.py
+- etc/nginx/sites-available/django_project.conf
+- etc/uwsgi/apps_available/django_project.ini
+
+backup:
+- '{{_prefix}}/etc/django/settings.py'
+- '{{_prefix}}/etc/nginx/sites-available/django_project.conf'
+- '{{_prefix}}/etc/uwsgi/apps_available/django_project.ini'
+
+depends:
+- python3.4
+- python3.4-venv
+- libpq-dev
+#- nginx
+#- uwsgi
+#- postgres common?
+
+makedepends:
+- python3.4
+- python3.4-dev
+- python3.4-venv
+- libpq-dev
+
+# checkdepends:
+# optdepends:
+
+pkgver_fcn: |
+  #!/usr/bin/env python
+  # Use latest package version present in index
+  import json
+  import urllib2
+  import sys
+  from distutils.version import StrictVersion
+  index = 'https://{{_pypi_host}}/hcastilho/dev/'
+
+  req = urllib2.Request('%s{{pkgname}}' % index)
+  req.add_header('Accept', 'application/json')
+  resp = urllib2.urlopen(req)
+  content= resp.read()
+  content = json.loads(content)
+  versions = content['result'].keys()
+  versions = [StrictVersion(version) for version in versions]
+  latest = sorted(versions)[-1]
+  sys.stdout.write(str(latest))
+  sys.exit(0)
+
+prepare: |
+  #!/usr/bin/env bash
+  set -e
+
+  python3 -m venv .
+  ./bin/pip install -U pip
+  ./bin/pip install {{pkgname}}
+  ./bin/django-admin collectstatic --settings=settings --pythonpath=. --noinput
+  rm settings.py
+
+
+package: |
+  #!/usr/bin/env bash
+  mkdir -p {{pkgdir}}/{{_prefix}}
+  cp -rp {{srcdir}}/* {{pkgdir}}/{{_prefix}}
+
+
+#pre_install: |
+#  #!/usr/bin/env bash
+
+
+post_install: |
+  #!/usr/bin/env bash
+  # User
+  #sudo adduser --system --no-create-home --shell /bin/bash {{_user}} || true
+
+  # Migrate database
+  #su {{_user}} -c "{{_prefix}}/bin/django-admin.py migrate --settings=settings --pythonpath={{_prefix}}/etc/django"

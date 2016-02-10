@@ -1,3 +1,6 @@
+# TODO maintainer
+# TODO vendor
+# TODO arch: native
 BASE_CONFIG = {
     # TODO search for more specific options <option name>_<architecture>_<distro>_<distro version> or any combination?
     # New
