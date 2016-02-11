@@ -34,7 +34,8 @@ BASE_CONFIG = {
     'pkgver': None,
     # The version of the software as released from the author (e.g., 2.7.1). The variable is not allowed to contain
     # colons or hyphens.
-    # The pkgver variable can be automatically updated by providing a pkgver() function in the PKGBUILD that outputs
+    'pkgver_fcn': None,
+    # The pkgver variable can be automatically updated by providing a pkgver_fcn() function in the PKGBUILD that outputs
     # the new package version. This is run after downloading and extracting the sources so it can use those files in
     # determining the new pkgver. This is most useful when used with sources from version control systems (see below).
 
