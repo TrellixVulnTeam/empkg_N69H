@@ -112,3 +112,19 @@ def mkdir_p(*args):
         os.makedirs(os.path.join(*args))
     except OSError:
         pass
+
+
+class chroot(object):
+    def __init__(self, new_root):
+        self.cwd = os.getcwd()
+        self.new_root = new_root
+        self.real_root = os.open('/', os.O_RDONLY)
+
+    def __enter__(self):
+        os.chroot(self.new_root)
+
+    def __exit__(self):
+        os.fchdir(self.real_root)
+        os.chroot('.')
+        os.close(self.real_root)
+        os.chdir(self.cwd)
