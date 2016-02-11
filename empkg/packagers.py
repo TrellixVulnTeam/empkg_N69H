@@ -223,7 +223,7 @@ class BasePackager(object):
         if self.conf['arch'] == 'any' and self.conf['pkgtype'] == 'deb':
             return 'all'
         else:
-            return self.arch
+            return self.conf['arch']
 
     @property
     def backup(self):
