@@ -28,7 +28,8 @@ def get_url(source, destination):
 def download_url(source, destination):
     remote = urlopen(source)
     if 'Content-Disposition' in remote.headers:
-        filename = remote.headers['Content-Disposition']
+        content_disposition = remote.headers['Content-Disposition']
+        filename = content_disposition.split('=')[1]
     else:
         filename = os.path.basename(source)
 
@@ -48,7 +49,10 @@ def download_url(source, destination):
 
 
 def extract(filename, destination):
-    _, extension = filename.rsplit('.', 1)
+    try:
+        _, extension = filename.rsplit('.', 1)
+    except ValueError:
+        return
     if extension in ('gz', 'bz2', 'tar'):
         with tarfile.open(filename, 'r:*') as fd:
             fd.extractall(destination)
