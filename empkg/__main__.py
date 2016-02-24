@@ -85,7 +85,9 @@ def remote_package(args, conf):
     put(local_path='*', remote_path=remotedir)
     with cd(remotedir):
         out = run('empkg %s' % ' '.join(args))
-        pkgname = out.split('\n')[-1]
+        pattern = re.compile(r':path=>"(.*?)"')
+        match = pattern.search(out)
+        pkgname = match.groups()[0]
         get(remote_path=os.path.join(remotedir, conf['pkgdir'], pkgname), local_path='.')
 
 
