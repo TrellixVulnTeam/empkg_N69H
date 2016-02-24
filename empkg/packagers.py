@@ -149,6 +149,7 @@ class BasePackager(object):
         self.conf['noextract'] = [Template(noextract).render(**self.conf) for noextract in self.conf['noextract']]
         self.conf['template'] = [Template(template).render(**self.conf) for template in self.conf['template']]
         self.conf['backup'] = [Template(template).render(**self.conf) for template in self.conf['backup']]
+        self.conf['changelog'] = Template(self.conf['changelog']).render(**self.conf)
 
     def get_sources(self):
         print 'Running sources...'
@@ -249,11 +250,11 @@ class BasePackager(object):
     @property
     def license(self):
         # TODO multiple licences?
-        return '--license "{}"'.format(self.conf['license'][0]) if self.conf['license'] else ''
+        return '--license "%s"' % self.conf['license'][0] if self.conf['license'] else ''
 
     @property
     def maintainer(self):
-        return '-m "{}"'.format(self.conf['maintainer']) if self.conf['maintainer'] else ''
+        return '-m "%s"' % self.conf['maintainer'] if self.conf['maintainer'] else ''
 
     @property
     def vendor(self):
@@ -261,4 +262,4 @@ class BasePackager(object):
 
     @property
     def url(self):
-        return '--url "{}"'.format(self.conf['url']) if self.conf['url'] else ''
+        return '--url "%s"' % self.conf['url'] if self.conf['url'] else ''
